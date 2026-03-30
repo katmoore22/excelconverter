@@ -4,1224 +4,612 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Excel Converter</title>
-
-<!-- SheetJS for Excel parsing and writing -->
-
+<title>MEA Report Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap');
-
-  :root {
-    --bg:        #0a0c10;
-    --surface:   #111418;
-    --border:    #1e2328;
-    --border2:   #2a3040;
-    --text:      #d4dae6;
-    --muted:     #5a6478;
-    --accent:    #4f8ef7;
-    --accent2:   #7c5cfc;
-
-    /* Status palette – mirrors Excel colours */
-    --arrived-bg:  #0f1a14;
-    --arrived-fg:  #4ade80;
-    --arrived-bd:  #1a3d26;
-
-    --transit-bg:  #0d1a2e;
-    --transit-fg:  #60a5fa;
-    --transit-bd:  #1a3254;
-
-    --booked-bg:   #111e14;
-    --booked-fg:   #a3e635;
-    --booked-bd:   #243a1c;
-
-    --pending-bg-bk: #1c1208;
-    --pending-fg-bk: #fb923c;
-    --pending-bd-bk: #3d2810;
-
-    --pending-bg:  #1c0a0a;
-    --pending-fg:  #f87171;
-    --pending-bd:  #3d1414;
-  }
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'DM Mono', monospace;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* ── Noise texture overlay ── */
-  body::before {
-    content: '';
-    position: fixed; inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-    opacity: .5;
-  }
-
-  /* ── Header ── */
-  header {
-    position: relative; z-index: 10;
-    padding: 2.5rem 3rem 2rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-
-  .header-left h1 {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: clamp(1.6rem, 3vw, 2.4rem);
-    letter-spacing: -0.03em;
-    line-height: 1;
-    background: linear-gradient(135deg, #d4dae6 0%, var(--accent) 60%, var(--accent2) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .header-left p {
-    margin-top: .4rem;
-    font-size: .72rem;
-    color: var(--muted);
-    letter-spacing: .12em;
-    text-transform: uppercase;
-  }
-
-  .timestamp-badge {
-    font-size: .68rem;
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: .3rem .7rem;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  /* ── Main layout ── */
-  main {
-    position: relative; z-index: 10;
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: 2.5rem 3rem 4rem;
-  }
-
-  /* ── Drop zone ── */
-  #drop-zone {
-    border: 2px dashed var(--border2);
-    border-radius: 12px;
-    padding: 4rem 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all .25s ease;
-    background: var(--surface);
-    position: relative;
-    overflow: hidden;
-  }
-
-  #drop-zone::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse at 50% 0%, rgba(79,142,247,.06) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  #drop-zone:hover, #drop-zone.dragover {
-    border-color: var(--accent);
-    background: #0f1520;
-  }
-
-  #drop-zone:hover::before, #drop-zone.dragover::before {
-    background: radial-gradient(ellipse at 50% 0%, rgba(79,142,247,.14) 0%, transparent 70%);
-  }
-
-  .drop-icon {
-    width: 52px; height: 52px;
-    margin: 0 auto 1.2rem;
-    stroke: var(--accent);
-    opacity: .7;
-  }
-
-  #drop-zone h2 {
-    font-family: 'Syne', sans-serif;
-    font-weight: 600;
-    font-size: 1.15rem;
-    margin-bottom: .5rem;
-  }
-
-  #drop-zone p {
-    font-size: .75rem;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  #file-input { display: none; }
-
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: .5rem;
-    margin-top: 1.5rem;
-    padding: .6rem 1.4rem;
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-family: 'DM Mono', monospace;
-    font-size: .75rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background .2s, transform .15s;
-    letter-spacing: .04em;
-  }
-
-  .btn-primary:hover { background: #3d7ee8; transform: translateY(-1px); }
-  .btn-primary:active { transform: translateY(0); }
-
-  /* ── Progress / status message ── */
-  #status-bar {
-    display: none;
-    margin-top: 1.5rem;
-    padding: .9rem 1.2rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: .75rem;
-    color: var(--accent);
-    line-height: 1.6;
-  }
-
-  #status-bar.error { color: var(--pending-fg); border-color: var(--pending-bd); }
-  #status-bar.success { color: var(--arrived-fg); border-color: var(--arrived-bd); }
-
-  /* ── Stats row ── */
-  #stats-row {
-    display: none;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 1rem;
-    margin-top: 2rem;
-  }
-
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1.1rem 1.3rem;
-    transition: border-color .2s;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .stat-card:hover { border-color: var(--border2); }
-  .stat-card.active { border-color: var(--accent) !important; }
-
-  .stat-card .count {
-    font-family: 'Syne', sans-serif;
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: .35rem;
-  }
-
-  .stat-card .label {
-    font-size: .65rem;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .stat-card.arrived  .count { color: var(--arrived-fg); }
-  .stat-card.transit  .count { color: var(--transit-fg); }
-  .stat-card.booked   .count { color: var(--booked-fg); }
-  .stat-card.pending-bk .count { color: var(--pending-fg-bk); }
-  .stat-card.pending  .count { color: var(--pending-fg); }
-
-  /* ── Controls bar ── */
-  #controls {
-    display: none;
-    margin-top: 1.5rem;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .search-wrap {
-    position: relative;
-    flex: 1;
-    min-width: 220px;
-  }
-
-  .search-wrap svg {
-    position: absolute;
-    left: .75rem; top: 50%;
-    transform: translateY(-50%);
-    width: 14px; height: 14px;
-    stroke: var(--muted);
-    pointer-events: none;
-  }
-
-  #search-input {
-    width: 100%;
-    padding: .55rem .75rem .55rem 2.1rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-family: 'DM Mono', monospace;
-    font-size: .75rem;
-    outline: none;
-    transition: border-color .2s;
-  }
-
-  #search-input:focus { border-color: var(--accent); }
-  #search-input::placeholder { color: var(--muted); }
-
-  .btn-export {
-    display: inline-flex;
-    align-items: center;
-    gap: .5rem;
-    padding: .55rem 1.2rem;
-    background: transparent;
-    border: 1px solid var(--border2);
-    border-radius: 6px;
-    color: var(--text);
-    font-family: 'DM Mono', monospace;
-    font-size: .75rem;
-    cursor: pointer;
-    transition: all .2s;
-    white-space: nowrap;
-  }
-
-  .btn-export:hover { border-color: var(--accent); color: var(--accent); }
-
-  .btn-reset {
-    padding: .55rem .9rem;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--muted);
-    font-family: 'DM Mono', monospace;
-    font-size: .75rem;
-    cursor: pointer;
-    transition: all .2s;
-  }
-
-  .btn-reset:hover { border-color: var(--pending-bd); color: var(--pending-fg); }
-
-  /* ── Table ── */
-  #table-section {
-    display: none;
-    margin-top: 1.5rem;
-    overflow-x: auto;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: .72rem;
-  }
-
-  thead th {
-    position: sticky; top: 0;
-    background: #0d1016;
-    border-bottom: 1px solid var(--border);
-    padding: .8rem 1rem;
-    text-align: left;
-    font-family: 'Syne', sans-serif;
-    font-weight: 600;
-    font-size: .65rem;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--muted);
-    white-space: nowrap;
-    cursor: pointer;
-    user-select: none;
-    transition: color .2s;
-  }
-
-  thead th:hover { color: var(--text); }
-  thead th.sort-asc::after  { content: ' ↑'; color: var(--accent); }
-  thead th.sort-desc::after { content: ' ↓'; color: var(--accent); }
-
-  tbody tr {
-    border-bottom: 1px solid var(--border);
-    transition: background .15s;
-  }
-
-  tbody tr:last-child { border-bottom: none; }
-  tbody tr:hover { background: rgba(255,255,255,.025); }
-
-  tbody td {
-    padding: .75rem 1rem;
-    vertical-align: middle;
-    white-space: nowrap;
-  }
-
-  td.hawb {
-    font-weight: 500;
-    color: #e8edf7;
-    letter-spacing: .04em;
-  }
-
-  td.lane { color: var(--muted); }
-
-  td.biz-unit {
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: #a0a8bc;
-  }
-
-  td.mawb { color: var(--muted); }
-
-  td.solution {
-    max-width: 320px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: #a0a8bc;
-  }
-
-  /* Status badge */
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: .35rem;
-    padding: .25rem .7rem;
-    border-radius: 4px;
-    font-size: .63rem;
-    font-weight: 500;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    border-width: 1px;
-    border-style: solid;
-  }
-
-  .status-badge::before {
-    content: '';
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .badge-arrived     { background: var(--arrived-bg);  color: var(--arrived-fg);  border-color: var(--arrived-bd);  }
-  .badge-arrived::before { background: var(--arrived-fg); }
-
-  .badge-transit     { background: var(--transit-bg);  color: var(--transit-fg);  border-color: var(--transit-bd);  }
-  .badge-transit::before { background: var(--transit-fg); }
-
-  .badge-booked      { background: var(--booked-bg);   color: var(--booked-fg);   border-color: var(--booked-bd);   }
-  .badge-booked::before { background: var(--booked-fg); }
-
-  .badge-pending-bk  { background: var(--pending-bg-bk); color: var(--pending-fg-bk); border-color: var(--pending-bd-bk); }
-  .badge-pending-bk::before { background: var(--pending-fg-bk); }
-
-  .badge-pending     { background: var(--pending-bg);  color: var(--pending-fg);  border-color: var(--pending-bd);  }
-  .badge-pending::before { background: var(--pending-fg); }
-
-  /* ── Empty state ── */
-  #empty-state {
-    display: none;
-    padding: 3rem;
-    text-align: center;
-    color: var(--muted);
-    font-size: .8rem;
-  }
-
-  /* ── Country filter tags ── */
-  #country-filter {
-    display: none;
-    flex-wrap: wrap;
-    gap: .4rem;
-    margin-top: 1rem;
-  }
-
-  .ctag {
-    padding: .22rem .6rem;
-    font-size: .62rem;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    border-radius: 3px;
-    border: 1px solid var(--border2);
-    background: var(--surface);
-    color: var(--muted);
-    cursor: pointer;
-    transition: all .15s;
-    user-select: none;
-  }
-
-  .ctag.on  { background: rgba(79,142,247,.15); border-color: var(--accent); color: var(--accent); }
-  .ctag:hover { border-color: var(--accent); color: var(--accent); }
-
-  /* ── Footer note ── */
-  footer {
-    position: relative; z-index: 10;
-    padding: 1.5rem 3rem;
-    border-top: 1px solid var(--border);
-    font-size: .65rem;
-    color: var(--muted);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  /* ── Animations ── */
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-  .fade-in { animation: fadeIn .35s ease forwards; }
-
-  @keyframes shimmer {
-    0%   { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-
-  .processing-row td {
-    background: linear-gradient(90deg, transparent 0%, rgba(79,142,247,.06) 50%, transparent 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.4s infinite;
-  }
-
-  /* ── Scrollbar ── */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-
-  @media (max-width: 900px) {
-    header, main, footer { padding-left: 1.2rem; padding-right: 1.2rem; }
-    #stats-row { grid-template-columns: repeat(3, 1fr); }
-  }
-  @media (max-width: 600px) {
-    #stats-row { grid-template-columns: repeat(2, 1fr); }
-  }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f4f0; --surface: #ffffff; --surface2: #eeece7;
+  --border: #d8d5cc; --border2: #c8c4b8; --text: #1a1916;
+  --muted: #6b6760; --dim: #a09d96; --accent: #1a1916;
+  --pending: #d97706; --pending-bg: #fef3c7; --pending-border: #fcd34d;
+  --booked: #16a34a; --booked-bg: #dcfce7; --booked-border: #86efac;
+  --transit: #1d4ed8; --transit-bg: #dbeafe; --transit-border: #93c5fd;
+  --arrived-bg: #f9fafb; --arrived-border: #e5e7eb;
+  --mono: 'IBM Plex Mono', monospace; --sans: 'IBM Plex Sans', sans-serif;
+}
+html, body { min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; }
+.app { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+header { background: var(--text); color: var(--bg); padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+.header-left { display: flex; align-items: center; gap: 16px; }
+.header-logo { width: 30px; height: 30px; background: var(--bg); clip-path: polygon(0 0,100% 0,100% 70%,70% 100%,0 100%); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700; font-size: 10px; color: var(--text); flex-shrink: 0; }
+.header-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.2); }
+.header-title { font-family: var(--mono); font-weight: 500; font-size: 13px; }
+.header-sub { font-size: 11px; color: rgba(255,255,255,0.45); font-family: var(--mono); }
+.header-right { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,0.4); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; animation: blink 2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+main { padding: 40px 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+/* Upload */
+.upload-zone { border: 2px dashed var(–border2); border-radius: 8px; background: var(–surface); padding: 56px 32px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+.upload-zone::before { content:’’; position:absolute; inset:0; background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(0,0,0,0.015) 10px,rgba(0,0,0,0.015) 20px); pointer-events:none; }
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(–accent); background: var(–surface2); }
+.upload-zone input[type=“file”] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.upload-icon { width:48px; height:48px; margin:0 auto 16px; background:var(–surface2); border:1px solid var(–border); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:22px; }
+.upload-title { font-family:var(–mono); font-weight:600; font-size:15px; margin-bottom:6px; }
+.upload-sub { font-size:12px; color:var(–muted); font-family:var(–mono); }
+.upload-accepted { margin-top:12px; font-size:11px; color:var(–dim); font-family:var(–mono); }
+
+/* File loaded */
+.file-loaded { display:flex; align-items:center; justify-content:space-between; background:var(–surface); border:1px solid var(–border); border-radius:8px; padding:16px 20px; margin-top:16px; animation:slideIn 0.3s ease; }
+@keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+.file-info { display:flex; align-items:center; gap:12px; }
+.file-icon { width:36px; height:36px; background:#16a34a; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:16px; color:white; }
+.file-name { font-family:var(–mono); font-weight:500; font-size:13px; }
+.file-meta { font-size:11px; color:var(–muted); font-family:var(–mono); margin-top:2px; }
+.btn-clear { background:none; border:1px solid var(–border2); border-radius:4px; padding:6px 12px; font-family:var(–mono); font-size:11px; color:var(–muted); cursor:pointer; transition:all 0.15s; }
+.btn-clear:hover { border-color:var(–accent); color:var(–accent); }
+
+/* Options */
+.options-panel { background:var(–surface); border:1px solid var(–border); border-radius:8px; padding:24px; margin-top:20px; display:none; animation:slideIn 0.3s ease; }
+.options-panel.visible { display:block; }
+.options-title { font-family:var(–mono); font-weight:600; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(–muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.options-title::after { content:’’; flex:1; height:1px; background:var(–border); }
+.options-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
+.option-field label { display:block; font-family:var(–mono); font-size:11px; color:var(–muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px; }
+.option-field input { width:100%; background:var(–bg); border:1px solid var(–border2); border-radius:4px; padding:8px 10px; font-family:var(–mono); font-size:12px; color:var(–text); transition:border-color 0.15s; }
+.option-field input:focus { outline:none; border-color:var(–accent); }
+
+/* Build button */
+.build-row { margin-top:20px; display:flex; gap:12px; align-items:center; }
+.btn-build { background:var(–text); color:var(–bg); border:none; border-radius:6px; padding:12px 28px; font-family:var(–mono); font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:opacity 0.15s; }
+.btn-build:hover { opacity:0.85; }
+.btn-build:disabled { opacity:0.4; cursor:not-allowed; }
+.spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite; display:none; }
+.btn-build.loading .spinner { display:block; }
+.btn-build.loading .btn-label { display:none; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.build-hint { font-size:11px; color:var(–dim); font-family:var(–mono); }
+
+/* Log */
+.log-panel { background:var(–text); color:#a0f0a0; border-radius:8px; padding:20px; margin-top:20px; font-family:var(–mono); font-size:12px; line-height:1.8; min-height:80px; display:none; animation:slideIn 0.3s ease; max-height:260px; overflow-y:auto; }
+.log-panel.visible { display:block; }
+.log-line.warn { color:#fcd34d; } .log-line.error { color:#f87171; } .log-line.dim { color:#4b5563; } .log-line.bold { color:#ffffff; font-weight:600; }
+
+/* Preview */
+.preview-panel { margin-top:24px; display:none; animation:slideIn 0.3s ease; }
+.preview-panel.visible { display:block; }
+.preview-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+.preview-title { font-family:var(–mono); font-weight:600; font-size:13px; }
+.btn-download { background:#16a34a; color:white; border:none; border-radius:5px; padding:10px 22px; font-family:var(–mono); font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.15s; }
+.btn-download:hover { background:#15803d; }
+.stats-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+.stat-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-family:var(–mono); font-size:11px; font-weight:500; }
+.stat-chip .dot { width:7px; height:7px; border-radius:50%; }
+.stat-pending { background:var(–pending-bg); color:var(–pending); border:1px solid var(–pending-border); }
+.stat-pending .dot { background:var(–pending); }
+.stat-booked { background:var(–booked-bg); color:var(–booked); border:1px solid var(–booked-border); }
+.stat-booked .dot { background:var(–booked); }
+.stat-transit { background:var(–transit-bg); color:var(–transit); border:1px solid var(–transit-border); }
+.stat-transit .dot { background:var(–transit); }
+.stat-arrived { background:var(–arrived-bg); color:var(–muted); border:1px solid var(–arrived-border); }
+.stat-arrived .dot { background:var(–muted); }
+.stat-total { background:var(–surface2); color:var(–text); border:1px solid var(–border); }
+.tbl-wrap { overflow-x:auto; border-radius:6px; border:1px solid var(–border); }
+.preview-table { width:100%; border-collapse:collapse; font-size:12px; font-family:var(–mono); }
+.preview-table thead tr { background:var(–text); color:var(–bg); }
+.preview-table th { padding:10px 12px; text-align:left; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; white-space:nowrap; font-weight:600; }
+.preview-table td { padding:8px 12px; border-bottom:1px solid var(–border); vertical-align:middle; }
+.preview-table tbody tr:last-child td { border-bottom:none; }
+.preview-table tbody tr:hover td { filter:brightness(0.97); }
+.row-pending td { background:var(–pending-bg); }
+.row-pending td:first-child { border-left:3px solid var(–pending); }
+.row-booked td { background:var(–booked-bg); }
+.row-booked td:first-child { border-left:3px solid var(–booked); }
+.row-transit td { background:var(–transit-bg); }
+.row-transit td:first-child { border-left:3px solid var(–transit); }
+.row-arrived td { background:var(–arrived-bg); }
+.row-arrived td:first-child { border-left:3px solid var(–arrived-border); }
+.row-section-header td { background:#1a1916; color:#f5f4f0; font-weight:600; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 12px; }
+.pill-status { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-weight:600; white-space:nowrap; }
+.pill-pending { background:var(–pending-bg); color:var(–pending); border:1px solid var(–pending-border); }
+.pill-booked  { background:var(–booked-bg);  color:var(–booked);  border:1px solid var(–booked-border); }
+.pill-transit { background:var(–transit-bg); color:var(–transit); border:1px solid var(–transit-border); }
+.pill-arrived { background:var(–arrived-bg); color:var(–muted);   border:1px solid var(–arrived-border); }
+
+footer { border-top:1px solid var(–border); padding:14px 32px; font-family:var(–mono); font-size:11px; color:var(–dim); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+@media(max-width:640px){ main{padding:24px 16px;} header{padding:0 16px;} footer{padding:12px 16px;} }
 </style>
 
 </head>
 <body>
+<div class="app">
 
 <header>
   <div class="header-left">
-    <h1>Excel Converter</h1>
-    <p>Middle East &amp; Gulf Region · Live Data Processor</p>
+    <div class="header-logo">MEA</div>
+    <div class="header-sep"></div>
+    <div class="header-title">MEA Report Builder</div>
+    <div class="header-sep"></div>
+    <div class="header-sub">mydhli → DGF Updates format</div>
   </div>
-  <div class="timestamp-badge" id="clock">UTC —</div>
+  <div class="header-right">
+    <div class="status-dot"></div>
+    Ready
+  </div>
 </header>
 
 <main>
+  <div class="upload-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls" />
+    <div class="upload-icon">📊</div>
+    <div class="upload-title">Drop your MEA Report here</div>
+    <div class="upload-sub">or click to browse</div>
+    <div class="upload-accepted">Accepts: mydhli_shipments .xlsx export · Header on row 10</div>
+  </div>
 
-  <!-- Drop Zone -->
+  <div class="file-loaded" id="fileLoaded" style="display:none">
+    <div class="file-info">
+      <div class="file-icon">✓</div>
+      <div>
+        <div class="file-name" id="fileName">—</div>
+        <div class="file-meta" id="fileMeta">—</div>
+      </div>
+    </div>
+    <button class="btn-clear" onclick="clearFile()">✕ Clear</button>
+  </div>
 
-  <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-    <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
-    </svg>
-    <h2>Drop Live Data Spreadsheet</h2>
-    <p>Accepts .xlsx or .xls exports from DHL TrakIT<br>
-       Filters for UAE · Bahrain · Egypt · Israel · Iran · Iraq · Jordan<br>
-       Kuwait · Lebanon · Oman · Qatar · Saudi Arabia · Syria · Yemen</p>
-    <button class="btn-primary" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-      Select File
+  <div class="options-panel" id="optionsPanel">
+    <div class="options-title">Options</div>
+    <div class="options-grid">
+      <div class="option-field">
+        <label>Cutoff Date — remove rows arrived before</label>
+        <input type="date" id="cutoffDate" />
+      </div>
+      <div class="option-field">
+        <label>Output Filename</label>
+        <input type="text" id="outputName" placeholder="DGF_MEA_Updates.xlsx" />
+      </div>
+    </div>
+  </div>
+
+  <div class="build-row" id="buildRow" style="display:none">
+    <button class="btn-build" id="buildBtn" onclick="buildReport()">
+      <span class="spinner"></span>
+      <span class="btn-label">⚙ Build Report</span>
     </button>
-    <input type="file" id="file-input" accept=".xlsx,.xls" />
+    <span class="build-hint">Filters MEA countries · applies status logic · exports .xlsx</span>
   </div>
 
-  <!-- Status bar -->
+  <div class="log-panel" id="logPanel"></div>
 
-  <div id="status-bar"></div>
-
-  <!-- Stats row -->
-
-  <div id="stats-row" style="display:none">
-    <div class="stat-card arrived" data-filter="Arrived" onclick="toggleFilter(this)">
-      <div class="count" id="cnt-arrived">0</div>
-      <div class="label">Arrived</div>
+  <div class="preview-panel" id="previewPanel">
+    <div class="preview-header">
+      <div class="preview-title" id="previewTitle">Preview</div>
+      <div>
+        <button class="btn-download" id="downloadBtn" onclick="downloadReport()">⬇ Download .xlsx</button>
+      </div>
     </div>
-    <div class="stat-card transit" data-filter="In Transit" onclick="toggleFilter(this)">
-      <div class="count" id="cnt-transit">0</div>
-      <div class="label">In Transit</div>
-    </div>
-    <div class="stat-card booked" data-filter="Booked" onclick="toggleFilter(this)">
-      <div class="count" id="cnt-booked">0</div>
-      <div class="label">Booked</div>
-    </div>
-    <div class="stat-card pending-bk" data-filter="Pending Booking" onclick="toggleFilter(this)">
-      <div class="count" id="cnt-pending-bk">0</div>
-      <div class="label">Pending Booking</div>
-    </div>
-    <div class="stat-card pending" data-filter="Pending" onclick="toggleFilter(this)">
-      <div class="count" id="cnt-pending">0</div>
-      <div class="label">Pending</div>
+    <div class="stats-row" id="statsRow"></div>
+    <div class="tbl-wrap">
+      <table class="preview-table">
+        <thead>
+          <tr>
+            <th>HAWB</th><th>Lane Pair</th><th>RTX Business Unit</th>
+            <th>Status</th><th>Solution</th><th>MAWB</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody"></tbody>
+      </table>
     </div>
   </div>
-
-  <!-- Country filter tags -->
-
-  <div id="country-filter"></div>
-
-  <!-- Controls -->
-
-  <div id="controls" style="display:none">
-    <div class="search-wrap">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" id="search-input" placeholder="Search HAWB, lane, solution..." oninput="applyFilters()">
-    </div>
-    <button class="btn-export" onclick="exportXLSX()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13m0 0l-4-4m4 4l4-4"/><path d="M3 20h18"/></svg>
-      Export XLSX
-    </button>
-    <button class="btn-export" id="copy-btn" onclick="copyTable()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-      Copy
-    </button>
-    <button class="btn-reset" onclick="resetAll()">Reset</button>
-  </div>
-
-  <!-- Table -->
-
-  <div id="table-section" style="display:none">
-    <table id="main-table">
-      <thead>
-        <tr>
-          <th onclick="sortBy(0)">HAWB</th>
-          <th onclick="sortBy(1)">Lane Pair</th>
-          <th onclick="sortBy(2)">RTX Business Unit</th>
-          <th onclick="sortBy(3)">Status</th>
-          <th onclick="sortBy(4)">Solution</th>
-          <th onclick="sortBy(5)">MAWB</th>
-        </tr>
-      </thead>
-      <tbody id="table-body"></tbody>
-    </table>
-    <div id="empty-state">No matching shipments found.</div>
-  </div>
-
 </main>
 
 <footer>
-  <span>Target regions: UAE · Bahrain · Egypt · Israel · Iran · Iraq · Jordan · Kuwait · Lebanon · Oman · Qatar · Saudi Arabia · Syria · Yemen</span>
-  <span id="row-count-label"></span>
+  <span>MEA Report Builder · v1.0</span>
+  <span>All processing runs locally in your browser — no data is uploaded</span>
 </footer>
+</div>
 
 <script>
-// ─────────────────────────────────────────────
-//  Constants
-// ─────────────────────────────────────────────
-const TARGET_COUNTRIES = new Set([
-  'AE','BH','EG','IL','IR','IQ','JO','KW','LB','OM','QA','SA','SY','YE'
-]);
+// ── State ──────────────────────────────────────────────────────────────────
+let workbook = null;
+let outputRows = [];
+let outputFilename = '';
 
-const COUNTRY_NAMES = {
-  AE:'UAE', BH:'Bahrain', EG:'Egypt', IL:'Israel', IR:'Iran', IQ:'Iraq',
-  JO:'Jordan', KW:'Kuwait', LB:'Lebanon', OM:'Oman', QA:'Qatar',
-  SA:'Saudi Arabia', SY:'Syria', YE:'Yemen'
-};
+const MEA_CODES = new Set(['AE','BH','EG','IL','IR','IQ','JO','KW','LB','OM','QA','SA','SY','YE']);
 
-// Column indices (0-based in the data rows, Excel col letters for reference)
-// Row 9 (index) = header; data starts index 10
-const COL = {
-  MODE:      1,   // B
-  HAWB:      2,   // C  HouseBill
-  ORIG_CC:   5,   // F  Origin Country Code
-  DEST_CC:   7,   // H  Destination Country Code
-  CONSIGNEE: 12,  // M  Consignee Name
-  SHIPPER:   19,  // T  Shipper Name
-  MAWB:      27,  // AB MasterBill
-  ORIG_CODE: 36,  // AK Origin Code First Leg  (e.g. USJFK)
-  DEST_CODE: 39,  // AN Destination Code First Leg (e.g. ILTLV)
-  AP:        41,  // AP Estimated Departure First Leg
-  AQ:        42,  // AQ Actual Departure First Leg
-  AR:        43,  // AR Estimated Arrival First Leg
-  BD:        55,  // BD Estimated Arrival Last Leg
-  BE:        56,  // BE Actual Arrival Last Leg
-  BI:        60,  // BI Actual Arrival (Overall)
-  TRANSIT_END: 8, // I  Transit End
-};
-
-// ─────────────────────────────────────────────
-//  State
-// ─────────────────────────────────────────────
-let allRows = [];
-let activeStatusFilter = null;
-let activeCountries = new Set();
-let sortCol = -1;
-let sortDir = 1;
-
-// ─────────────────────────────────────────────
-//  Clock
-// ─────────────────────────────────────────────
-function updateClock() {
-  const now = new Date();
-  const utc = now.toUTCString().replace(' GMT', ' UTC');
-  document.getElementById('clock').textContent = utc;
+// ── Utilities ──────────────────────────────────────────────────────────────
+function getCode(v) {
+  if (!v) return '';
+  const s = String(v).trim();
+  if (!s || s === 'nan' || s === 'None') return '';
+  if (s.length === 5) return s.slice(2);
+  if (s.length > 3)   return s.slice(-3);
+  return s;
 }
-updateClock();
-setInterval(updateClock, 1000);
 
-// ─────────────────────────────────────────────
-//  Drag & drop
-// ─────────────────────────────────────────────
-const dropZone = document.getElementById('drop-zone');
+function toDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === 'number') {
+    const d = new Date((v - 25569) * 86400000);
+    return isNaN(d) ? null : d;
+  }
+  const d = new Date(String(v));
+  return isNaN(d) ? null : d;
+}
 
-dropZone.addEventListener('dragover', e => {
-  e.preventDefault();
-  dropZone.classList.add('dragover');
-});
+function dateOnly(v) {
+  const d = toDate(v);
+  if (!d) return null;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
 
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+function fmtDate(v) {
+  const d = toDate(v);
+  if (!d) return '';
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getUTCDate()).padStart(2,'0')}${MONTHS[d.getUTCMonth()]}${String(d.getUTCFullYear()).slice(-2)}`;
+}
 
+function fmtDatetime(v) {
+  const d = toDate(v);
+  if (!d) return '';
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dt = `${String(d.getUTCDate()).padStart(2,'0')}${MONTHS[d.getUTCMonth()]}${String(d.getUTCFullYear()).slice(-2)}`;
+  const tm = `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+  return `${dt} ${tm}`;
+}
+
+function getBU(consignee) {
+  const cu = String(consignee || '').toUpperCase();
+  if (cu.includes('PRATT') && cu.includes('CANADA')) return 'Pratt & Whitney Canada';
+  if (cu.includes('PRATT'))                           return 'Pratt & Whitney US';
+  if (cu.includes('COLLINS') || cu.includes('HAMILTON SUNDSTRAND') || cu.includes('ROCKWELL COLLINS'))
+    return 'Collins Aerospace';
+  if (cu.includes('RAYTHEON')) return 'Raytheon';
+  return 'Collins Aerospace';
+}
+
+function log(msg, type = 'info') {
+  const p = document.getElementById('logPanel');
+  p.classList.add('visible');
+  const line = document.createElement('p');
+  line.className = `log-line ${type}`;
+  line.textContent = msg;
+  p.appendChild(line);
+  p.scrollTop = p.scrollHeight;
+}
+
+function clearLog() {
+  const p = document.getElementById('logPanel');
+  p.innerHTML = '';
+  p.classList.remove('visible');
+}
+
+// ── File handling ──────────────────────────────────────────────────────────
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
-  dropZone.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file) processFile(file);
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
 });
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
 
-document.getElementById('file-input').addEventListener('change', e => {
-  if (e.target.files[0]) processFile(e.target.files[0]);
-  e.target.value = '';
-});
-
-// ─────────────────────────────────────────────
-//  Date helpers
-// ─────────────────────────────────────────────
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-function excelDateToDate(v) {
-  // SheetJS gives us Date objects or serial numbers
-  if (v instanceof Date) return v;
-  if (typeof v === 'number') {
-    // Excel serial number
-    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
-    return d;
-  }
-  if (typeof v === 'string' && v.trim()) {
-    const d = new Date(v);
-    if (!isNaN(d)) return d;
-  }
-  return null;
-}
-
-function fmtDate(d) {
-  if (!d) return null;
-  const dt = d instanceof Date ? d : excelDateToDate(d);
-  if (!dt || isNaN(dt)) return null;
-  const day = String(dt.getUTCDate()).padStart(2,'0');
-  const mon = MONTHS[dt.getUTCMonth()];
-  const yr  = String(dt.getUTCFullYear()).slice(-2);
-  return `${day}${mon}${yr}`;
-}
-
-function fmtDateTime(d) {
-  if (!d) return null;
-  const dt = d instanceof Date ? d : excelDateToDate(d);
-  if (!dt || isNaN(dt)) return null;
-  const day = String(dt.getUTCDate()).padStart(2,'0');
-  const mon = MONTHS[dt.getUTCMonth()];
-  const yr  = String(dt.getUTCFullYear()).slice(-2);
-  const hh  = String(dt.getUTCHours()).padStart(2,'0');
-  const mm  = String(dt.getUTCMinutes()).padStart(2,'0');
-  return `${day}${mon}${yr} ${hh}:${mm}`;
-}
-
-function hasVal(v) {
-  return v !== null && v !== undefined && v !== '';
-}
-
-// ─────────────────────────────────────────────
-//  Business Unit inference
-// ─────────────────────────────────────────────
-function getBizUnit(consignee, shipper) {
-  const s = ((consignee || '') + ' ' + (shipper || '')).toUpperCase();
-  if (s.includes('PRATT & WHITNEY CANADA') || s.includes('P&W CANADA') || s.includes('PWC') || s.includes('P&W CANADA')) {
-    return 'Pratt & Whitney Canada';
-  }
-  if (s.includes('PRATT') || s.includes('PRATT AND WHITNEY') || s.includes('P&W')) {
-    return 'Pratt & Whitney US';
-  }
-  if (s.includes('COLLINS') || s.includes('ROCKWELL COLLINS')) {
-    return 'Collins Aerospace';
-  }
-  if (s.includes('RAYTHEON')) {
-    return 'Raytheon';
-  }
-  return 'Collins Aerospace'; // default
-}
-
-// ─────────────────────────────────────────────
-//  Lane Pair
-// ─────────────────────────────────────────────
-function getLane(row) {
-  const orig = String(row[COL.ORIG_CODE] || '');
-  const dest = String(row[COL.DEST_CODE] || '');
-  const o3 = orig.length >= 3 ? orig.slice(-3) : orig;
-  const d3 = dest.length >= 3 ? dest.slice(-3) : dest;
-  if (o3 && d3) return `${o3}-${d3}`;
-  return '';
-}
-
-// ─────────────────────────────────────────────
-//  Status + Solution from timestamps
-// ─────────────────────────────────────────────
-function getDestCode(row) {
-  // Last leg first, then first leg
-  for (const col of [51, COL.DEST_CODE]) {
-    const v = String(row[col] || '');
-    if (v && v !== 'undefined' && v.length >= 3) return v.slice(-3);
-  }
-  return '';
-}
-
-function getStatusAndSolution(row) {
-  const ap  = excelDateToDate(row[COL.AP]);   // Estimated Departure First Leg
-  const aq  = excelDateToDate(row[COL.AQ]);   // Actual Departure First Leg
-  const ar  = excelDateToDate(row[COL.AR]);   // Estimated Arrival First Leg
-  const bd  = excelDateToDate(row[COL.BD]);   // Estimated Arrival Last Leg
-  const be  = excelDateToDate(row[COL.BE]);   // Actual Arrival Last Leg
-  const bi  = excelDateToDate(row[COL.BI]);   // Actual Arrival Overall
-  const te  = excelDateToDate(row[COL.TRANSIT_END]); // Transit End
-
-  const dest = getDestCode(row);
-
-  // ── ARRIVED: actual arrival recorded ──────────────────
-  if (hasVal(row[COL.BI]) && bi) {
-    return { status: 'Arrived', solution: `Arrived on ${fmtDate(bi)}` };
-  }
-  if (hasVal(row[COL.BE]) && be) {
-    return { status: 'Arrived', solution: `Arrived on ${fmtDate(be)}` };
-  }
-
-  // ── IN TRANSIT: actual departure recorded, no arrival yet ──
-  if (hasVal(row[COL.AQ]) && aq) {
-    const depStr = fmtDate(aq);
-    const etaVal = bd || ar;
-    if (etaVal) {
-      const etaStr = fmtDate(etaVal);
-      return {
-        status: 'In Transit',
-        solution: dest
-          ? `Departed ${depStr}, ETA to ${dest} ${etaStr}`
-          : `Departed ${depStr}, ETA ${etaStr}`
-      };
-    }
-    return { status: 'In Transit', solution: `Departed ${depStr}, in transit` };
-  }
-
-  // ── BOOKED: scheduled departure but not yet departed ──
-  if (hasVal(row[COL.AP]) && ap) {
-    const depStr  = fmtDate(ap);
-    const etaVal  = ar || bd;
-    const etaStr  = etaVal ? fmtDateTime(etaVal) : null;
-    if (etaStr) {
-      return {
-        status: 'Booked',
-        solution: dest
-          ? `Booked for ${depStr}, ETA to ${dest} ${etaStr}`
-          : `Booked for ${depStr}, ETA ${etaStr}`
-      };
-    }
-    return { status: 'Booked', solution: `Booked for ${depStr}` };
-  }
-
-  // ── PENDING BOOKING: has MAWB but nothing scheduled ──
-  const mawb = String(row[COL.MAWB] || '').trim();
-  if (mawb && mawb !== 'undefined' && mawb !== 'nan') {
-    return { status: 'Pending Booking', solution: '' };
-  }
-
-  // ── PENDING: nothing at all ────────────────────────────
-  return { status: 'Pending', solution: 'Pending' };
-}
-
-// ─────────────────────────────────────────────
-//  Main file processing
-// ─────────────────────────────────────────────
-function setStatus(msg, type) {
-  const el = document.getElementById('status-bar');
-  el.textContent = msg;
-  el.className = type || '';
-  el.style.display = 'block';
-}
-
-function processFile(file) {
-  setStatus(`⟳  Reading ${file.name} …`);
-
+function handleFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const wb = XLSX.read(e.target.result, {
-        type: 'array',
-        cellDates: true,
-        dateNF: 'yyyy-mm-dd hh:mm:ss'
-      });
-
-      const sheetName = wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-
-      // Convert to array of arrays
-      const raw = XLSX.utils.sheet_to_json(ws, {
-        header: 1,
-        raw: false,
-        defval: '',
-        dateNF: 'yyyy-mm-dd hh:mm:ss'
-      });
-
-      // Re-read with dates as Date objects for timestamp logic
-      const rawDates = XLSX.utils.sheet_to_json(ws, {
-        header: 1,
-        raw: true,
-        defval: null
-      });
-
-      // Find the header row (contains "HouseBill")
-      let headerRowIdx = -1;
-      for (let i = 0; i < Math.min(raw.length, 20); i++) {
-        if (raw[i].some(c => String(c).trim() === 'HouseBill')) {
-          headerRowIdx = i;
-          break;
-        }
+      workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const sheet = workbook.Sheets['mydhli_shipments'];
+      if (!sheet) {
+        alert('Could not find sheet named "mydhli_shipments". Please check the file.');
+        return;
       }
+      const range = XLSX.utils.decode_range(sheet['!ref']);
+      const rowCount = Math.max(0, range.e.r - 10);
 
-      if (headerRowIdx === -1) {
-        throw new Error('Could not find data header row. Expected a row containing "HouseBill".');
-      }
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('fileMeta').textContent = `~${rowCount} data rows · ${(file.size/1024).toFixed(0)} KB`;
+      document.getElementById('fileLoaded').style.display = 'flex';
+      document.getElementById('dropZone').style.display = 'none';
+      document.getElementById('optionsPanel').classList.add('visible');
+      document.getElementById('buildRow').style.display = 'flex';
 
-      const dataRows = rawDates.slice(headerRowIdx + 1);
-      setStatus(`⟳  Processing ${dataRows.length} shipments …`);
+      const base = file.name.replace(/\.[^.]+$/, '').replace('MEA_Report', 'DGF_MEA_Updates');
+      document.getElementById('outputName').value = base + '_output.xlsx';
 
-      const results = [];
-      const countriesSeen = new Set();
-
-      for (const row of dataRows) {
-        if (!row || !row[COL.HAWB]) continue;
-        const hawb = String(row[COL.HAWB]).trim();
-        if (!hawb || hawb === 'HouseBill') continue;
-
-        const origCC = String(row[COL.ORIG_CC] || '').trim().toUpperCase();
-        const destCC = String(row[COL.DEST_CC] || '').trim().toUpperCase();
-
-        // Filter: must have origin OR destination in target region
-        if (!TARGET_COUNTRIES.has(origCC) && !TARGET_COUNTRIES.has(destCC)) continue;
-
-        const ss   = getStatusAndSolution(row);
-        const lane = getLane(row);
-        const biz  = getBizUnit(row[COL.CONSIGNEE], row[COL.SHIPPER]);
-        let mawb   = String(row[COL.MAWB] || '').trim();
-        if (mawb === 'undefined' || mawb === 'nan') mawb = '';
-        // Take first MAWB if multiple comma-separated
-        mawb = mawb.split(',')[0].trim();
-
-        // Track countries for filter tags
-        if (TARGET_COUNTRIES.has(origCC)) countriesSeen.add(origCC);
-        if (TARGET_COUNTRIES.has(destCC)) countriesSeen.add(destCC);
-
-        results.push({
-          hawb, lane, biz,
-          status: ss.status,
-          solution: ss.solution,
-          mawb,
-          origCC, destCC
-        });
-      }
-
-      if (results.length === 0) {
-        throw new Error('No shipments found for target countries. Verify the file contains DHL TrakIT data with the expected column structure.');
-      }
-
-      // Store & render
-      allRows = results;
-      activeStatusFilter = null;
-      activeCountries = new Set(countriesSeen);
-      sortCol = -1;
-      sortDir = 1;
-
-      renderCountryFilters(countriesSeen);
-      updateStats();
-      applyFilters();
-      showUI();
-
-      setStatus(
-        `✓  Loaded ${results.length} shipments from "${file.name}". ` +
-        `Filtered from ${dataRows.length} total records.`,
-        'success'
-      );
-
-    } catch (err) {
-      setStatus(`✗  Error: ${err.message}`, 'error');
-      console.error(err);
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm   = String(today.getMonth() + 1).padStart(2, '0');
+      const dd   = String(today.getDate()).padStart(2, '0');
+      document.getElementById('cutoffDate').value = `${yyyy}-${mm}-${dd}`;
+    } catch(err) {
+      alert('Error reading file: ' + err.message);
     }
   };
-
-  reader.onerror = () => setStatus('✗  Failed to read file.', 'error');
   reader.readAsArrayBuffer(file);
 }
 
-// ─────────────────────────────────────────────
-//  UI helpers
-// ─────────────────────────────────────────────
-function showUI() {
-  document.getElementById('stats-row').style.display = 'grid';
-  document.getElementById('stats-row').style.gridTemplateColumns = 'repeat(5,1fr)';
-  document.getElementById('country-filter').style.display = 'flex';
-  document.getElementById('controls').style.display = 'flex';
-  document.getElementById('table-section').style.display = 'block';
-  document.getElementById('stats-row').classList.add('fade-in');
+function clearFile() {
+  workbook = null; outputRows = [];
+  document.getElementById('fileLoaded').style.display = 'none';
+  document.getElementById('dropZone').style.display = 'block';
+  document.getElementById('optionsPanel').classList.remove('visible');
+  document.getElementById('buildRow').style.display = 'none';
+  document.getElementById('previewPanel').classList.remove('visible');
+  document.getElementById('previewBody').innerHTML = '';
+  clearLog();
+  fileInput.value = '';
 }
 
-function updateStats() {
-  const counts = { Arrived: 0, 'In Transit': 0, Booked: 0, 'Pending Booking': 0, Pending: 0 };
-  allRows.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
-  document.getElementById('cnt-arrived').textContent    = counts['Arrived'];
-  document.getElementById('cnt-transit').textContent    = counts['In Transit'];
-  document.getElementById('cnt-booked').textContent     = counts['Booked'];
-  document.getElementById('cnt-pending-bk').textContent = counts['Pending Booking'];
-  document.getElementById('cnt-pending').textContent    = counts['Pending'];
+// ── Build ──────────────────────────────────────────────────────────────────
+function buildReport() {
+  if (!workbook) return;
+  const btn = document.getElementById('buildBtn');
+  btn.classList.add('loading'); btn.disabled = true;
+  clearLog();
+  document.getElementById('previewPanel').classList.remove('visible');
+  setTimeout(() => {
+    try   { _doBuild(); }
+    catch (err) { log('ERROR: ' + err.message, 'error'); console.error(err); }
+    btn.classList.remove('loading'); btn.disabled = false;
+  }, 60);
 }
 
-function renderCountryFilters(codes) {
-  const wrap = document.getElementById('country-filter');
-  wrap.innerHTML = '';
-  const sortedCodes = [...codes].sort((a,b) => (COUNTRY_NAMES[a]||a).localeCompare(COUNTRY_NAMES[b]||b));
-  sortedCodes.forEach(cc => {
-    const tag = document.createElement('span');
-    tag.className = 'ctag on';
-    tag.textContent = COUNTRY_NAMES[cc] || cc;
-    tag.dataset.cc = cc;
-    tag.onclick = () => {
-      if (activeCountries.has(cc)) activeCountries.delete(cc);
-      else activeCountries.add(cc);
-      tag.classList.toggle('on', activeCountries.has(cc));
-      applyFilters();
-    };
-    wrap.appendChild(tag);
-  });
-}
+function _doBuild() {
+  const cutoffStr = document.getElementById('cutoffDate').value;
+  const cutoff    = cutoffStr ? new Date(cutoffStr + 'T00:00:00Z') : new Date();
+  outputFilename  = (document.getElementById('outputName').value || 'DGF_MEA_Updates.xlsx').replace(/(?<!\.xlsx)$/, '');
+  if (!outputFilename.endsWith('.xlsx')) outputFilename += '.xlsx';
 
-// ─────────────────────────────────────────────
-//  Filtering & sorting
-// ─────────────────────────────────────────────
-function toggleFilter(card) {
-  const filter = card.dataset.filter;
-  if (activeStatusFilter === filter) {
-    activeStatusFilter = null;
-    document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
-  } else {
-    activeStatusFilter = filter;
-    document.querySelectorAll('.stat-card').forEach(c => {
-      c.classList.toggle('active', c.dataset.filter === filter);
-    });
-  }
-  applyFilters();
-}
+  log(`▶ Starting build  ·  cutoff: ${cutoffStr || 'today'}`, 'bold');
 
-function applyFilters() {
-  const query = (document.getElementById('search-input').value || '').toLowerCase();
+  const sheet = workbook.Sheets['mydhli_shipments'];
+  const range = XLSX.utils.decode_range(sheet['!ref']);
 
-  let filtered = allRows.filter(r => {
-    // Status filter
-    if (activeStatusFilter && r.status !== activeStatusFilter) return false;
-    // Country filter
-    const relevantCountry =
-      (r.origCC && activeCountries.has(r.origCC)) ||
-      (r.destCC && activeCountries.has(r.destCC));
-    if (!relevantCountry) return false;
-    // Search
-    if (query) {
-      const haystack = [r.hawb, r.lane, r.biz, r.status, r.solution, r.mawb]
-        .join(' ').toLowerCase();
-      if (!haystack.includes(query)) return false;
-    }
-    return true;
-  });
-
-  // Sort
-  if (sortCol >= 0) {
-    const keys = ['hawb','lane','biz','status','solution','mawb'];
-    const key = keys[sortCol];
-    filtered.sort((a,b) => {
-      const av = (a[key] || '').toLowerCase();
-      const bv = (b[key] || '').toLowerCase();
-      return av < bv ? -sortDir : av > bv ? sortDir : 0;
-    });
+  // Map column headers (row 10 = index 9)
+  const colMap = {};
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: 9, c })];
+    if (cell && cell.v) colMap[String(cell.v)] = c;
   }
 
-  renderTable(filtered);
-  document.getElementById('row-count-label').textContent =
-    `${filtered.length} of ${allRows.length} shipments`;
-}
-
-function sortBy(col) {
-  if (sortCol === col) sortDir *= -1;
-  else { sortCol = col; sortDir = 1; }
-
-  document.querySelectorAll('thead th').forEach((th, i) => {
-    th.className = i === col ? (sortDir === 1 ? 'sort-asc' : 'sort-desc') : '';
-  });
-  applyFilters();
-}
-
-// ─────────────────────────────────────────────
-//  Table rendering
-// ─────────────────────────────────────────────
-function badgeClass(status) {
-  switch (status) {
-    case 'Arrived':         return 'badge-arrived';
-    case 'In Transit':      return 'badge-transit';
-    case 'Booked':          return 'badge-booked';
-    case 'Pending Booking': return 'badge-pending-bk';
-    case 'Pending':         return 'badge-pending';
-    default:                return 'badge-pending';
-  }
-}
-
-function esc(s) {
-  return String(s || '')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function renderTable(rows) {
-  const tbody = document.getElementById('table-body');
-  const empty = document.getElementById('empty-state');
-
-  if (rows.length === 0) {
-    tbody.innerHTML = '';
-    empty.style.display = 'block';
-    return;
-  }
-
-  empty.style.display = 'none';
-  tbody.innerHTML = rows.map(r => `
-    <tr>
-      <td class="hawb">${esc(r.hawb)}</td>
-      <td class="lane">${esc(r.lane)}</td>
-      <td class="biz-unit">${esc(r.biz)}</td>
-      <td><span class="status-badge ${badgeClass(r.status)}">${esc(r.status)}</span></td>
-      <td class="solution" title="${esc(r.solution)}">${esc(r.solution)}</td>
-      <td class="mawb">${esc(r.mawb)}</td>
-    </tr>
-  `).join('');
-}
-
-// ─────────────────────────────────────────────
-//  Export to XLSX  (mirrors Master v2 format)
-// ─────────────────────────────────────────────
-function exportXLSX() {
-  if (!allRows.length) return;
-
-  // Apply current filters for export
-  const query = (document.getElementById('search-input').value || '').toLowerCase();
-  const toExport = allRows.filter(r => {
-    if (activeStatusFilter && r.status !== activeStatusFilter) return false;
-    const relevantCountry =
-      (r.origCC && activeCountries.has(r.origCC)) ||
-      (r.destCC && activeCountries.has(r.destCC));
-    if (!relevantCountry) return false;
-    if (query) {
-      const hay = [r.hawb, r.lane, r.biz, r.status, r.solution, r.mawb].join(' ').toLowerCase();
-      if (!hay.includes(query)) return false;
-    }
-    return true;
-  });
-
-  // Status colour fills matching Master v2 Excel colours
-  const STATUS_FILL = {
-    'Arrived':         { fgColor: { rgb: 'FFFFFFFF' } },   // white
-    'In Transit':      { fgColor: { rgb: 'FFBDD7EE' } },   // light blue  (~theme 3 tint 0.75)
-    'Booked':          { fgColor: { rgb: 'FFE2EFDA' } },   // light green (~theme 9 tint 0.8)
-    'Pending Booking': { fgColor: { rgb: 'FFFFC000' } },   // orange
-    'Pending':         { fgColor: { rgb: 'FFFF0000' } },   // red
+  const COLS = {
+    HAWB:      colMap['HouseBill'],
+    ORIG_CC:   colMap['Origin Country/Region Code'],
+    DEST_CC:   colMap['Destination Country/Region Code'],
+    CONSIGNEE: colMap['Consignee Name'],
+    MAWB:      colMap['MasterBill'],
+    AK:        colMap['Origin Code (First Leg)'],
+    AN:        colMap['Destination Code (First Leg)'],
+    AZ:        colMap['Destination Code (Last Leg)'],
+    AP:        colMap['Estimated Departure (First Leg)'],
+    AQ:        colMap['Actual Departure (First Leg)'],
+    BD:        colMap['Actual Departure (Last Leg)'],
+    BE:        colMap['Estimated Arrival (Last Leg)'],
+    BF:        colMap['Actual Arrival (Last Leg)'],
+    BJ:        colMap['Actual Arrival'],
   };
 
-  const headerRow = ['HAWB','Lane Pair','RTX Business Unit','Status','Solution','MAWB'];
+  const missing = Object.entries(COLS).filter(([,v]) => v === undefined).map(([k]) => k);
+  if (missing.length) log(`⚠ Columns not found: ${missing.join(', ')}`, 'warn');
 
-  const wb = XLSX.utils.book_new();
-  const wsData = [headerRow, ...toExport.map(r => [r.hawb, r.lane, r.biz, r.status, r.solution, r.mawb])];
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  function cv(r, key) {
+    const c = COLS[key];
+    if (c === undefined) return null;
+    const cell = sheet[XLSX.utils.encode_cell({ r, c })];
+    return cell ? (cell.v !== undefined ? cell.v : null) : null;
+  }
 
-  // Column widths
-  ws['!cols'] = [
-    { wch: 14 },  // HAWB
-    { wch: 12 },  // Lane
-    { wch: 24 },  // Biz Unit
-    { wch: 16 },  // Status
-    { wch: 52 },  // Solution
-    { wch: 16 },  // MAWB
-  ];
+  const rows = [];
+  let removedCount = 0, meaCount = 0;
 
-  // Apply styles to header
-  const headerStyle = {
-    font: { bold: true, sz: 10, name: 'Aptos Narrow' },
-    fill: { fgColor: { rgb: 'FF1F3864' }, patternType: 'solid' },
-    font_color: { rgb: 'FFFFFFFF' },
-    alignment: { horizontal: 'center' }
+  for (let r = 10; r <= range.e.r; r++) {
+    const hawb = String(cv(r, 'HAWB') || '').trim();
+    if (!hawb) continue;
+
+    const origCC = String(cv(r, 'ORIG_CC') || '').trim().toUpperCase();
+    const destCC = String(cv(r, 'DEST_CC') || '').trim().toUpperCase();
+    if (!MEA_CODES.has(origCC) && !MEA_CODES.has(destCC)) continue;
+    meaCount++;
+
+    const ap = cv(r, 'AP'), aq = cv(r, 'AQ');
+    const bd = cv(r, 'BD'), be = cv(r, 'BE');
+    const bf = cv(r, 'BF'), bj = cv(r, 'BJ');
+    const ak = getCode(cv(r, 'AK'));
+    const an = getCode(cv(r, 'AN'));
+    const az = getCode(cv(r, 'AZ'));
+    const dest = az || an;
+    const lane = (ak && dest) ? `${ak}-${dest}` : (ak || dest || '');
+
+    let mawb = String(cv(r, 'MAWB') || '');
+    if (mawb.includes(',')) mawb = mawb.split(',')[1].trim();
+    if (mawb === 'nan' || mawb === 'None') mawb = '';
+
+    const bu = getBU(cv(r, 'CONSIGNEE'));
+    const arrRaw = bd || bf || bj;
+    let status, cat, solution;
+
+    if (arrRaw) {
+      const arrDate = dateOnly(arrRaw);
+      if (arrDate && arrDate < cutoff) { removedCount++; continue; }
+      status = 'Arrived'; cat = 'arrived';
+      solution = `Arrived on ${fmtDate(arrRaw)}`;
+    } else if (ap && aq) {
+      status = 'In Transit'; cat = 'in_transit';
+      const eta = fmtDatetime(be);
+      solution = (eta && dest) ? `Departed ${fmtDate(aq)}, ETA to ${dest} ${eta}` : `Departed ${fmtDate(aq)}`;
+    } else if (ap) {
+      status = 'Booked'; cat = 'booked';
+      const eta = fmtDatetime(be);
+      solution = (eta && dest) ? `Booked for ${fmtDate(ap)}, ETA to ${dest} ${eta}` : `Booked for ${fmtDate(ap)}`;
+    } else {
+      status = 'Pending'; cat = 'pending'; solution = '';
+    }
+
+    rows.push({ hawb, lane, bu, status, solution, mawb, cat });
+  }
+
+  log(`  Found ${meaCount} MEA rows`, 'info');
+  log(`  Removed ${removedCount} rows arrived before cutoff`, removedCount > 0 ? 'warn' : 'dim');
+
+  const ORDER = { pending:0, booked:1, in_transit:2, arrived:3 };
+  const isTLV = r => r.lane.includes('TLV');
+
+  const nonTLV = rows.filter(r => !isTLV(r)).sort((a,b) => ORDER[a.cat] - ORDER[b.cat]);
+  const tlv    = rows.filter(r =>  isTLV(r)).sort((a,b) => ORDER[a.cat] - ORDER[b.cat]);
+  outputRows = [...nonTLV, ...tlv];
+
+  const counts = { pending:0, booked:0, in_transit:0, arrived:0 };
+  rows.forEach(r => counts[r.cat]++);
+
+  log('', 'dim');
+  log(`  Non-TLV rows : ${nonTLV.length}`, 'info');
+  log(`  TLV rows     : ${tlv.length}`,    'info');
+  log(`  Total        : ${rows.length}`,   'bold');
+  log('', 'dim');
+  if (counts.pending)    log(`  Pending      : ${counts.pending}`,    'warn');
+  if (counts.booked)     log(`  Booked       : ${counts.booked}`,     'info');
+  if (counts.in_transit) log(`  In Transit   : ${counts.in_transit}`, 'info');
+  if (counts.arrived)    log(`  Arrived      : ${counts.arrived}`,    'dim');
+  log('', 'dim');
+  log('✓ Build complete · ready to download', 'bold');
+
+  renderPreview(nonTLV, tlv, counts, rows.length);
+}
+
+// ── Preview ────────────────────────────────────────────────────────────────
+function renderPreview(nonTLV, tlv, counts, total) {
+  const tbody = document.getElementById('previewBody');
+  tbody.innerHTML = '';
+
+  function sectionHeader(label) {
+    const tr = document.createElement('tr');
+    tr.className = 'row-section-header';
+    const td = document.createElement('td');
+    td.colSpan = 6; td.textContent = label;
+    tr.appendChild(td);
+    return tr;
+  }
+
+  function dataRow(r) {
+    const tr = document.createElement('tr');
+    tr.className = r.cat === 'in_transit' ? 'row-transit' : `row-${r.cat}`;
+    const pillCls = { pending:'pill-pending', booked:'pill-booked', in_transit:'pill-transit', arrived:'pill-arrived' }[r.cat];
+    [r.hawb, r.lane, r.bu, `<span class="pill-status ${pillCls}">${r.status}</span>`, r.solution, r.mawb].forEach((v, i) => {
+      const td = document.createElement('td');
+      if (i === 3) { td.innerHTML = v; }
+      else {
+        td.textContent = v || '';
+        if (i === 4) { td.style.maxWidth = '320px'; td.style.fontSize = '11px'; }
+      }
+      tr.appendChild(td);
+    });
+    return tr;
+  }
+
+  tbody.appendChild(sectionHeader(`Non-TLV Lanes — ${nonTLV.length} rows`));
+  nonTLV.forEach(r => tbody.appendChild(dataRow(r)));
+  tbody.appendChild(sectionHeader(`TLV Lanes — ${tlv.length} rows`));
+  tlv.forEach(r => tbody.appendChild(dataRow(r)));
+
+  document.getElementById('statsRow').innerHTML = `
+    <span class="stat-chip stat-total"><span class="dot" style="background:var(--text)"></span>${total} rows</span>
+    ${counts.pending    ? `<span class="stat-chip stat-pending"><span class="dot"></span>${counts.pending} Pending</span>`       : ''}
+    ${counts.booked     ? `<span class="stat-chip stat-booked"><span class="dot"></span>${counts.booked} Booked</span>`          : ''}
+    ${counts.in_transit ? `<span class="stat-chip stat-transit"><span class="dot"></span>${counts.in_transit} In Transit</span>` : ''}
+    ${counts.arrived    ? `<span class="stat-chip stat-arrived"><span class="dot"></span>${counts.arrived} Arrived</span>`       : ''}
+  `;
+  document.getElementById('previewTitle').textContent = `Preview — ${outputFilename}`;
+  document.getElementById('previewPanel').classList.add('visible');
+}
+
+// ── Download ───────────────────────────────────────────────────────────────
+function downloadReport() {
+  if (!outputRows.length) return;
+
+  const wb    = XLSX.utils.book_new();
+  const isTLV = r => r.lane.includes('TLV');
+  const nonTLV = outputRows.filter(r => !isTLV(r));
+  const tlv    = outputRows.filter(r =>  isTLV(r));
+
+  // Fill colours (ARGB)
+  const FILLS = {
+    header:     { fgColor: { rgb: 'FF1A1916' }, patternType: 'solid' },
+    booked:     { fgColor: { rgb: 'FF92D050' }, patternType: 'solid' },
+    in_transit: { fgColor: { rgb: 'FFBDD7EE' }, patternType: 'solid' },
+    pending:    { fgColor: { rgb: 'FFFFC000' }, patternType: 'solid' },
+    arrived:    { patternType: 'none' },
   };
 
-  // Apply row fills based on status
-  for (let i = 0; i < toExport.length; i++) {
-    const rowIdx = i + 1; // 0=header, 1+ = data
-    const status = toExport[i].status;
-    const fill = STATUS_FILL[status] || STATUS_FILL['Arrived'];
+  const BORDER = {
+    top:    { style: 'thin', color: { rgb: 'FF000000' } },
+    bottom: { style: 'thin', color: { rgb: 'FF000000' } },
+    left:   { style: 'thin', color: { rgb: 'FF000000' } },
+    right:  { style: 'thin', color: { rgb: 'FF000000' } },
+  };
 
-    for (let col = 0; col < 6; col++) {
-      const cellAddr = XLSX.utils.encode_cell({ r: rowIdx, c: col });
-      if (!ws[cellAddr]) ws[cellAddr] = { v: '', t: 's' };
-      ws[cellAddr].s = {
-        fill: { ...fill, patternType: 'solid' },
-        font: { sz: 10, name: 'Aptos Narrow' },
-        alignment: { vertical: 'center' }
-      };
-    }
+  const FONT_HDR  = { name: 'Aptos Narrow', sz: 11, bold: true,  color: { rgb: 'FFF5F4F0' } };
+  const FONT_DATA = { name: 'Aptos Narrow', sz: 11, bold: false, color: { rgb: 'FF1A1916' } };
+
+  function hdrCell(v) {
+    return { v, t: 's', s: { font: FONT_HDR, fill: FILLS.header, border: BORDER, alignment: { vertical: 'center' } } };
   }
 
-  // Style header row
-  for (let col = 0; col < 6; col++) {
-    const cellAddr = XLSX.utils.encode_cell({ r: 0, c: col });
-    if (!ws[cellAddr]) ws[cellAddr] = { v: '', t: 's' };
-    ws[cellAddr].s = {
-      fill: { fgColor: { rgb: 'FF1F3864' }, patternType: 'solid' },
-      font: { bold: true, sz: 10, name: 'Aptos Narrow', color: { rgb: 'FFFFFFFF' } },
-      alignment: { horizontal: 'center', vertical: 'center' }
-    };
+  function dataCell(v, cat) {
+    return { v: v || '', t: 's', s: { font: FONT_DATA, fill: FILLS[cat] || FILLS.arrived, border: BORDER, alignment: { vertical: 'center', wrapText: false } } };
   }
+
+  const HEADERS = ['HAWB', 'Lane Pair', 'RTX Business Unit', 'Status', 'Solution', 'MAWB'];
+  const sheetAoa = [];
+  let rowIdx = 0;
+  let filterRowIdx = -1;
+
+  function pushHeader(isFilter) {
+    sheetAoa.push(HEADERS.map(h => hdrCell(h)));
+    if (isFilter) filterRowIdx = rowIdx;
+    rowIdx++;
+  }
+
+  function pushRow(r) {
+    sheetAoa.push([r.hawb, r.lane, r.bu, r.status, r.solution, r.mawb].map(v => dataCell(v, r.cat)));
+    rowIdx++;
+  }
+
+  pushHeader(false);
+  nonTLV.forEach(r => pushRow(r));
+  pushHeader(true);
+  tlv.forEach(r => pushRow(r));
+
+  const ws = XLSX.utils.aoa_to_sheet(sheetAoa.map(row => row.map(c => c.v)));
+
+  // Apply styles cell-by-cell
+  sheetAoa.forEach((row, ri) => {
+    row.forEach((cell, ci) => {
+      const addr = XLSX.utils.encode_cell({ r: ri, c: ci });
+      if (!ws[addr]) ws[addr] = {};
+      ws[addr].s = cell.s;
+    });
+  });
+
+  if (filterRowIdx >= 0) {
+    ws['!autofilter'] = { ref: `A${filterRowIdx + 1}:F${filterRowIdx + 1}` };
+  }
+
+  ws['!cols'] = [{ wch: 9 }, { wch: 10 }, { wch: 29 }, { wch: 16 }, { wch: 62 }, { wch: 13 }];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Updates');
-
-  // Generate filename with today's date
-  const now = new Date();
-  const dateStr = fmtDate(now) || 'export';
-  XLSX.writeFile(wb, `RTX_FreightTracker_${dateStr}.xlsx`, { bookSST: false, type: 'binary' });
-}
-
-// ─────────────────────────────────────────────
-//  Reset
-// ─────────────────────────────────────────────
-function resetAll() {
-  allRows = [];
-  activeStatusFilter = null;
-  activeCountries = new Set();
-  sortCol = -1; sortDir = 1;
-
-  document.getElementById('search-input').value = '';
-  document.getElementById('stats-row').style.display = 'none';
-  document.getElementById('country-filter').style.display = 'none';
-  document.getElementById('controls').style.display = 'none';
-  document.getElementById('table-section').style.display = 'none';
-  document.getElementById('status-bar').style.display = 'none';
-  document.getElementById('table-body').innerHTML = '';
-  document.getElementById('row-count-label').textContent = '';
-  document.getElementById('file-input').value = '';
+  XLSX.writeFile(wb, outputFilename, { bookType: 'xlsx', type: 'binary', cellStyles: true });
+  log(`⬇ Downloaded: ${outputFilename}`, 'bold');
 }
 </script>
 
