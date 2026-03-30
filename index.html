@@ -5,650 +5,682 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MEA Report Builder</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<!-- SheetJS for reading xlsx -->
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- ExcelJS for writing xlsx with full style support -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-<!-- FileSaver for download -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg: #f5f4f0; --surface: #ffffff; --surface2: #eeece7;
-  --border: #d8d5cc; --border2: #c8c4b8; --text: #1a1916;
-  --muted: #6b6760; --dim: #a09d96;
-  --pending: #d97706; --pending-bg: #fef3c7; --pending-border: #fcd34d;
-  --booked: #16a34a; --booked-bg: #dcfce7; --booked-border: #86efac;
-  --transit: #1d4ed8; --transit-bg: #dbeafe; --transit-border: #93c5fd;
-  --arrived-bg: #f9fafb; --arrived-border: #e5e7eb;
-  --mono: 'IBM Plex Mono', monospace; --sans: 'IBM Plex Sans', sans-serif;
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--s2:#eeece7;--bdr:#d8d5cc;--bdr2:#c8c4b8;
+  --ink:#1a1916;--muted:#6b6760;--dim:#a09d96;
+  --p:#d97706;--pbg:#fef3c7;--pbr:#fcd34d;
+  --g:#16a34a;--gbg:#dcfce7;--gbr:#86efac;
+  --b:#1d4ed8;--bbg:#dbeafe;--bbr:#93c5fd;
+  --abg:#f9fafb;--abr:#e5e7eb;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif
 }
-html, body { min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; }
-.app { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
-
-/* Header */
-header { background: var(–text); color: var(–bg); padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
-.header-left { display: flex; align-items: center; gap: 16px; }
-.header-logo { width: 30px; height: 30px; background: var(–bg); clip-path: polygon(0 0,100% 0,100% 70%,70% 100%,0 100%); display: flex; align-items: center; justify-content: center; font-family: var(–mono); font-weight: 700; font-size: 10px; color: var(–text); }
-.header-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.2); }
-.header-title { font-family: var(–mono); font-weight: 500; font-size: 13px; }
-.header-sub { font-size: 11px; color: rgba(255,255,255,0.45); font-family: var(–mono); }
-.header-right { display: flex; align-items: center; gap: 8px; font-family: var(–mono); font-size: 11px; color: rgba(255,255,255,0.4); }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; animation: blink 2s ease-in-out infinite; }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-/* Main */
-main { padding: 40px 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
-
-/* Upload zone */
-.upload-zone { border: 2px dashed var(–border2); border-radius: 8px; background: var(–surface); padding: 56px 32px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
-.upload-zone::before { content:’’; position:absolute; inset:0; background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(0,0,0,0.015) 10px,rgba(0,0,0,0.015) 20px); pointer-events:none; }
-.upload-zone:hover, .upload-zone.drag-over { border-color: var(–text); background: var(–surface2); }
-.upload-zone input[type=“file”] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
-.upload-icon { width:48px; height:48px; margin:0 auto 16px; background:var(–surface2); border:1px solid var(–border); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:22px; }
-.upload-title { font-family:var(–mono); font-weight:600; font-size:15px; margin-bottom:6px; }
-.upload-sub { font-size:12px; color:var(–muted); font-family:var(–mono); }
-.upload-hint { margin-top:12px; font-size:11px; color:var(–dim); font-family:var(–mono); }
-
-/* File loaded */
-.file-loaded { display:flex; align-items:center; justify-content:space-between; background:var(–surface); border:1px solid var(–border); border-radius:8px; padding:16px 20px; margin-top:16px; animation:slideIn 0.3s ease; }
-@keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-.file-info { display:flex; align-items:center; gap:12px; }
-.file-icon { width:36px; height:36px; background:#16a34a; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:16px; color:white; }
-.file-name { font-family:var(–mono); font-weight:500; font-size:13px; }
-.file-meta { font-size:11px; color:var(–muted); font-family:var(–mono); margin-top:2px; }
-.btn-clear { background:none; border:1px solid var(–border2); border-radius:4px; padding:6px 12px; font-family:var(–mono); font-size:11px; color:var(–muted); cursor:pointer; transition:all 0.15s; }
-.btn-clear:hover { border-color:var(–text); color:var(–text); }
-
-/* Options */
-.options-panel { background:var(–surface); border:1px solid var(–border); border-radius:8px; padding:24px; margin-top:20px; display:none; animation:slideIn 0.3s ease; }
-.options-panel.visible { display:block; }
-.options-title { font-family:var(–mono); font-weight:600; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(–muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-.options-title::after { content:’’; flex:1; height:1px; background:var(–border); }
-.options-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
-.option-field label { display:block; font-family:var(–mono); font-size:10px; color:var(–muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px; }
-.option-field input { width:100%; background:var(–bg); border:1px solid var(–border2); border-radius:4px; padding:8px 10px; font-family:var(–mono); font-size:12px; color:var(–text); transition:border-color 0.15s; }
-.option-field input:focus { outline:none; border-color:var(–text); }
-
-/* Buttons */
-.build-row { margin-top:20px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-.btn-build { background:var(–text); color:var(–bg); border:none; border-radius:6px; padding:12px 28px; font-family:var(–mono); font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:opacity 0.15s; }
-.btn-build:hover { opacity:0.82; }
-.btn-build:disabled { opacity:0.35; cursor:not-allowed; }
-.spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite; display:none; }
-.btn-build.loading .spinner { display:block; }
-.btn-build.loading .btn-label { display:none; }
-@keyframes spin { to{transform:rotate(360deg)} }
-.build-hint { font-size:11px; color:var(–dim); font-family:var(–mono); }
-.btn-download { background:#16a34a; color:white; border:none; border-radius:6px; padding:12px 24px; font-family:var(–mono); font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.15s; }
-.btn-download:hover { background:#15803d; }
-.btn-download:disabled { opacity:0.4; cursor:not-allowed; }
-
-/* Log */
-.log-panel { background:#111; color:#a0f0a0; border-radius:8px; padding:20px; margin-top:20px; font-family:var(–mono); font-size:12px; line-height:1.9; min-height:60px; max-height:240px; overflow-y:auto; display:none; animation:slideIn 0.3s ease; }
-.log-panel.visible { display:block; }
-.ll { margin:0; } .ll.warn{color:#fcd34d;} .ll.error{color:#f87171;} .ll.dim{color:#374151;} .ll.bold{color:#fff;font-weight:600;}
-
-/* Preview */
-.preview-panel { margin-top:28px; display:none; animation:slideIn 0.3s ease; }
-.preview-panel.visible { display:block; }
-.preview-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
-.preview-title { font-family:var(–mono); font-weight:600; font-size:13px; }
-.stats-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
-.chip { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-family:var(–mono); font-size:11px; font-weight:500; }
-.chip .dot { width:7px; height:7px; border-radius:50%; }
-.chip-total   { background:var(–surface2); color:var(–text); border:1px solid var(–border); }
-.chip-pending { background:var(–pending-bg); color:var(–pending); border:1px solid var(–pending-border); }
-.chip-pending .dot { background:var(–pending); }
-.chip-booked  { background:var(–booked-bg); color:var(–booked); border:1px solid var(–booked-border); }
-.chip-booked .dot  { background:var(–booked); }
-.chip-transit { background:var(–transit-bg); color:var(–transit); border:1px solid var(–transit-border); }
-.chip-transit .dot { background:var(–transit); }
-.chip-arrived { background:var(–arrived-bg); color:var(–muted); border:1px solid var(–arrived-border); }
-.chip-arrived .dot { background:var(–muted); }
-
-.tbl-wrap { overflow-x:auto; border-radius:6px; border:1px solid var(–border); }
-.preview-table { width:100%; border-collapse:collapse; font-size:12px; font-family:var(–mono); }
-.preview-table thead tr { background:var(–text); color:var(–bg); }
-.preview-table th { padding:10px 12px; text-align:left; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; white-space:nowrap; font-weight:600; }
-.preview-table td { padding:8px 12px; border-bottom:1px solid var(–border); vertical-align:middle; }
-.preview-table tbody tr:last-child td { border-bottom:none; }
-.row-pending td  { background:var(–pending-bg); }
-.row-pending td:first-child { border-left:3px solid var(–pending); }
-.row-booked td   { background:var(–booked-bg); }
-.row-booked td:first-child  { border-left:3px solid var(–booked); }
-.row-transit td  { background:var(–transit-bg); }
-.row-transit td:first-child { border-left:3px solid var(–transit); }
-.row-arrived td  { background:var(–arrived-bg); }
-.row-arrived td:first-child { border-left:3px solid var(–arrived-border); }
-.row-sec-hdr td  { background:#1a1916; color:#f5f4f0; font-weight:600; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 12px; }
-.pill { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-weight:600; white-space:nowrap; }
-.pill-pending { background:var(–pending-bg); color:var(–pending); border:1px solid var(–pending-border); }
-.pill-booked  { background:var(–booked-bg);  color:var(–booked);  border:1px solid var(–booked-border); }
-.pill-transit { background:var(–transit-bg); color:var(–transit); border:1px solid var(–transit-border); }
-.pill-arrived { background:var(–arrived-bg); color:var(–muted);   border:1px solid var(–arrived-border); }
-
-footer { border-top:1px solid var(–border); padding:14px 32px; font-family:var(–mono); font-size:11px; color:var(–dim); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
-@media(max-width:640px){ main{padding:24px 16px;} header{padding:0 16px;} footer{padding:12px 16px;} .header-sub{display:none;} }
+html,body{min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5}
+/* ── Layout ── */
+header{background:var(--ink);color:var(--bg);padding:0 32px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:9}
+.hl{display:flex;align-items:center;gap:14px}
+.logo{width:28px;height:28px;background:var(--bg);clip-path:polygon(0 0,100% 0,100% 70%,70% 100%,0 100%);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:9px;color:var(--ink)}
+.vr{width:1px;height:18px;background:rgba(255,255,255,.2)}
+.ht{font-family:var(--mono);font-size:13px;font-weight:500}
+.hs{font-size:11px;color:rgba(255,255,255,.4);font-family:var(--mono)}
+.hr{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.35)}
+.dot{width:6px;height:6px;border-radius:50%;background:#4ade80;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+main{padding:40px 32px;max-width:1160px;margin:0 auto;width:100%}
+/* ── Drop zone ── */
+.dz{border:2px dashed var(--bdr2);border-radius:8px;background:var(--surface);padding:52px 32px;text-align:center;cursor:pointer;transition:.2s;position:relative;overflow:hidden}
+.dz::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(0,0,0,.012) 10px,rgba(0,0,0,.012) 20px);pointer-events:none}
+.dz:hover,.dz.over{border-color:var(--ink);background:var(--s2)}
+.dz input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-ico{width:44px;height:44px;margin:0 auto 14px;background:var(--s2);border:1px solid var(--bdr);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.dz-t{font-family:var(--mono);font-weight:600;font-size:15px;margin-bottom:5px}
+.dz-s{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.dz-h{margin-top:9px;font-size:11px;color:var(--dim);font-family:var(--mono)}
+/* ── File bar ── */
+.fb{display:none;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--bdr);border-radius:8px;padding:14px 18px;margin-top:14px}
+.fi{display:flex;align-items:center;gap:11px}
+.fic{width:34px;height:34px;background:#16a34a;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px}
+.fn{font-family:var(--mono);font-weight:500;font-size:13px}
+.fm{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.btnx{background:none;border:1px solid var(--bdr2);border-radius:4px;padding:5px 11px;font-family:var(--mono);font-size:11px;color:var(--muted);cursor:pointer;transition:.15s}
+.btnx:hover{border-color:var(--ink);color:var(--ink)}
+/* ── Options ── */
+.opts{background:var(--surface);border:1px solid var(--bdr);border-radius:8px;padding:22px;margin-top:16px;display:none}
+.opts.on{display:block}
+.ol{font-family:var(--mono);font-weight:600;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.ol::after{content:'';flex:1;height:1px;background:var(--bdr)}
+.og{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.of label{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.of input{width:100%;background:var(--bg);border:1px solid var(--bdr2);border-radius:4px;padding:7px 9px;font-family:var(--mono);font-size:12px;color:var(--ink);transition:.15s}
+.of input:focus{outline:none;border-color:var(--ink)}
+/* ── Buttons ── */
+.br{margin-top:18px;display:none;align-items:center;gap:10px;flex-wrap:wrap}
+.br.on{display:flex}
+.btnb{background:var(--ink);color:var(--bg);border:none;border-radius:6px;padding:11px 26px;font-family:var(--mono);font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:7px;transition:opacity .15s}
+.btnb:hover{opacity:.82}
+.btnb:disabled{opacity:.35;cursor:not-allowed}
+.sp{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+.btnb.ld .sp{display:block}
+.btnb.ld .bl{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btnd{background:#16a34a;color:#fff;border:none;border-radius:6px;padding:11px 22px;font-family:var(--mono);font-weight:600;font-size:13px;cursor:pointer;display:none;align-items:center;gap:6px;transition:background .15s}
+.btnd:hover{background:#15803d}
+.btnd.on{display:flex}
+.bhint{font-size:11px;color:var(--dim);font-family:var(--mono)}
+/* ── Log ── */
+.log{background:#0f0f0f;color:#86efac;border-radius:8px;padding:18px;margin-top:18px;font-family:var(--mono);font-size:12px;line-height:1.9;max-height:200px;overflow-y:auto;display:none}
+.log.on{display:block}
+.ll{margin:0}.ll.w{color:#fcd34d}.ll.e{color:#f87171}.ll.d{color:#374151}.ll.b{color:#fff;font-weight:600}
+/* ── Preview ── */
+.pv{margin-top:26px;display:none}
+.pv.on{display:block}
+.pvh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.pvt{font-family:var(--mono);font-weight:600;font-size:13px}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;font-weight:500}
+.chip .cd{width:6px;height:6px;border-radius:50%}
+.chtot{background:var(--s2);color:var(--ink);border:1px solid var(--bdr)}
+.chp{background:var(--pbg);color:var(--p);border:1px solid var(--pbr)}.chp .cd{background:var(--p)}
+.chg{background:var(--gbg);color:var(--g);border:1px solid var(--gbr)}.chg .cd{background:var(--g)}
+.chb{background:var(--bbg);color:var(--b);border:1px solid var(--bbr)}.chb .cd{background:var(--b)}
+.cha{background:var(--abg);color:var(--muted);border:1px solid var(--abr)}.cha .cd{background:var(--muted)}
+.tw{overflow-x:auto;border-radius:6px;border:1px solid var(--bdr)}
+table{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)}
+thead tr{background:var(--ink);color:var(--bg)}
+th{padding:9px 11px;text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;font-weight:600}
+td{padding:7px 11px;border-bottom:1px solid var(--bdr);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+.rp td{background:var(--pbg)}.rp td:first-child{border-left:3px solid var(--p)}
+.rg td{background:var(--gbg)}.rg td:first-child{border-left:3px solid var(--g)}
+.rb td{background:var(--bbg)}.rb td:first-child{border-left:3px solid var(--b)}
+.ra td{background:var(--abg)}.ra td:first-child{border-left:3px solid var(--abr)}
+.rh td{background:#1a1916;color:#f5f4f0;font-weight:600;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:6px 11px}
+.pill{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:600;white-space:nowrap}
+.pp{background:var(--pbg);color:var(--p);border:1px solid var(--pbr)}
+.pg{background:var(--gbg);color:var(--g);border:1px solid var(--gbr)}
+.pb{background:var(--bbg);color:var(--b);border:1px solid var(--bbr)}
+.pa{background:var(--abg);color:var(--muted);border:1px solid var(--abr)}
+footer{border-top:1px solid var(--bdr);padding:13px 32px;font-family:var(--mono);font-size:11px;color:var(--dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:40px}
+@media(max-width:600px){main{padding:20px 14px}header{padding:0 14px}footer{padding:12px 14px}.hs{display:none}}
 </style>
-
 </head>
 <body>
-<div class="app">
-
 <header>
-  <div class="header-left">
-    <div class="header-logo">MEA</div>
-    <div class="header-sep"></div>
-    <div class="header-title">MEA Report Builder</div>
-    <div class="header-sep"></div>
-    <div class="header-sub">mydhli export → DGF Updates format</div>
+  <div class="hl">
+    <div class="logo">MEA</div><div class="vr"></div>
+    <div class="ht">MEA Report Builder</div><div class="vr"></div>
+    <div class="hs">mydhli → DGF Updates format</div>
   </div>
-  <div class="header-right">
-    <div class="status-dot"></div>
-    Ready
-  </div>
+  <div class="hr"><div class="dot"></div>Ready</div>
 </header>
 
 <main>
-  <!-- Upload -->
-  <div class="upload-zone" id="dropZone">
-    <input type="file" id="fileInput" accept=".xlsx,.xls" />
-    <div class="upload-icon">📊</div>
-    <div class="upload-title">Drop your MEA Report here</div>
-    <div class="upload-sub">or click to browse</div>
-    <div class="upload-hint">Accepts mydhli_shipments .xlsx · Header row 10 · Data from row 11</div>
+  <div class="dz" id="dz">
+    <input type="file" id="fi" accept=".xlsx,.xls">
+    <div class="dz-ico">📊</div>
+    <div class="dz-t">Drop your MEA Report here</div>
+    <div class="dz-s">or click to browse</div>
+    <div class="dz-h">mydhli_shipments .xlsx · Header row 10 · Data from row 11</div>
   </div>
 
-  <div class="file-loaded" id="fileLoaded" style="display:none">
-    <div class="file-info">
-      <div class="file-icon">✓</div>
-      <div>
-        <div class="file-name" id="fileName"></div>
-        <div class="file-meta" id="fileMeta"></div>
-      </div>
+  <div class="fb" id="fb">
+    <div class="fi">
+      <div class="fic">✓</div>
+      <div><div class="fn" id="fn"></div><div class="fm" id="fm"></div></div>
     </div>
-    <button class="btn-clear" onclick="clearFile()">✕ Clear</button>
+    <button class="btnx" onclick="reset()">✕ Clear</button>
   </div>
 
-  <div class="options-panel" id="optionsPanel">
-    <div class="options-title">Options</div>
-    <div class="options-grid">
-      <div class="option-field">
-        <label>Cutoff Date — remove rows arrived before</label>
-        <input type="date" id="cutoffDate" />
-      </div>
-      <div class="option-field">
-        <label>Output Filename</label>
-        <input type="text" id="outputName" placeholder="DGF_MEA_Updates.xlsx" />
-      </div>
+  <div class="opts" id="opts">
+    <div class="ol">Options</div>
+    <div class="og">
+      <div class="of"><label>Cutoff — remove arrived before</label><input type="date" id="cut"></div>
+      <div class="of"><label>Output Filename</label><input type="text" id="oname" placeholder="DGF_MEA_Updates.xlsx"></div>
     </div>
   </div>
 
-  <div class="build-row" id="buildRow" style="display:none">
-    <button class="btn-build" id="buildBtn" onclick="buildReport()">
-      <span class="spinner"></span>
-      <span class="btn-label">⚙ Build Report</span>
+  <div class="br" id="br">
+    <button class="btnb" id="bb" onclick="build()">
+      <div class="sp"></div><span class="bl">⚙ Build Report</span>
     </button>
-    <button class="btn-download" id="downloadBtn" onclick="downloadReport()" disabled style="display:none">
-      ⬇ Download .xlsx
-    </button>
-    <span class="build-hint" id="buildHint">Filters MEA countries · applies status logic · exports colour-coded .xlsx</span>
+    <button class="btnd" id="dl" onclick="download()">⬇ Download .xlsx</button>
+    <span class="bhint">14 MEA countries · status logic · colour-coded .xlsx</span>
   </div>
 
-  <div class="log-panel" id="logPanel"></div>
+  <div class="log" id="log"></div>
 
-  <div class="preview-panel" id="previewPanel">
-    <div class="preview-header">
-      <div class="preview-title" id="previewTitle">Preview</div>
-    </div>
-    <div class="stats-row" id="statsRow"></div>
-    <div class="tbl-wrap">
-      <table class="preview-table">
-        <thead><tr>
-          <th>HAWB</th><th>Lane Pair</th><th>RTX Business Unit</th>
-          <th>Status</th><th>Solution</th><th>MAWB</th>
-        </tr></thead>
-        <tbody id="previewBody"></tbody>
-      </table>
-    </div>
+  <div class="pv" id="pv">
+    <div class="pvh"><div class="pvt" id="pvt">Preview</div></div>
+    <div class="chips" id="chips"></div>
+    <div class="tw"><table>
+      <thead><tr><th>HAWB</th><th>Lane Pair</th><th>RTX Business Unit</th><th>Status</th><th>Solution</th><th>MAWB</th></tr></thead>
+      <tbody id="tb"></tbody>
+    </table></div>
   </div>
 </main>
 
 <footer>
-  <span>MEA Report Builder · v2.0</span>
-  <span>All processing runs locally in your browser — no data is uploaded</span>
+  <span>MEA Report Builder · v3.0</span>
+  <span>All processing is local — no data is uploaded</span>
 </footer>
-</div>
 
 <script>
-// ─────────────────────────────────────────────────────────────────────────────
-// STATE
-// ─────────────────────────────────────────────────────────────────────────────
-let workbook   = null;
-let outputRows = [];
-let outputFile = '';
+// ── State ─────────────────────────────────────────────────────────────────
+var WB=null, ROWS=[], FNAME='';
+var MEA=new Set(['AE','BH','EG','IL','IR','IQ','JO','KW','LB','OM','QA','SA','SY','YE']);
+var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var ORD={pending:0,booked:1,in_transit:2,arrived:3};
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
-const MEA_CODES = new Set(['AE','BH','EG','IL','IR','IQ','JO','KW','LB','OM','QA','SA','SY','YE']);
+// ── Helpers ───────────────────────────────────────────────────────────────
+function gc(v){if(!v)return'';var s=String(v).trim();if(!s||s=='nan'||s=='None')return'';return s.length==5?s.slice(2):s.length>3?s.slice(-3):s;}
+function toD(v){if(!v)return null;if(v instanceof Date)return isNaN(v)?null:v;if(typeof v=='number'){var d=new Date((v-25569)*86400000);return isNaN(d)?null:d;}var d=new Date(String(v));return isNaN(d)?null:d;}
+function d0(v){var d=toD(v);if(!d)return null;return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));}
+function fd(v){var d=toD(v);if(!d)return'';return('0'+d.getUTCDate()).slice(-2)+MON[d.getUTCMonth()]+String(d.getUTCFullYear()).slice(-2);}
+function fdt(v){var d=toD(v);if(!d)return'';return fd(v)+' '+('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2);}
+function getBU(c){var u=String(c||'').toUpperCase();if(u.includes('PRATT')&&u.includes('CANADA'))return'Pratt & Whitney Canada';if(u.includes('PRATT'))return'Pratt & Whitney US';if(u.includes('COLLINS')||u.includes('HAMILTON SUNDSTRAND')||u.includes('ROCKWELL COLLINS'))return'Collins Aerospace';if(u.includes('RAYTHEON'))return'Raytheon';return'Collins Aerospace';}
+function xe(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-// ExcelJS fill definitions (argb = Alpha+RGB, fully opaque)
-const XL_FILLS = {
-  header:     { type:'pattern', pattern:'solid', fgColor:{ argb:'FF1A1916' } },
-  booked:     { type:'pattern', pattern:'solid', fgColor:{ argb:'FF92D050' } },  // light green
-  in_transit: { type:'pattern', pattern:'solid', fgColor:{ argb:'FFBDD7EE' } },  // light blue
-  pending:    { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFC000' } },  // orange
-  arrived:    { type:'pattern', pattern:'none'  },
-};
+// ── Log ───────────────────────────────────────────────────────────────────
+function lg(m,t){var el=document.getElementById('log');el.classList.add('on');var p=document.createElement('p');p.className='ll'+(t?' '+t:'');p.textContent=m;el.appendChild(p);el.scrollTop=el.scrollHeight;}
+function clg(){var el=document.getElementById('log');el.innerHTML='';el.classList.remove('on');}
 
-const XL_FONT_HDR  = { name:'Aptos Narrow', size:11, bold:true,  color:{ argb:'FFF5F4F0' } };
-const XL_FONT_DATA = { name:'Aptos Narrow', size:11, bold:false, color:{ argb:'FF1A1916' } };
+// ── File load ─────────────────────────────────────────────────────────────
+var dz=document.getElementById('dz'),fi=document.getElementById('fi');
+dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',function(){dz.classList.remove('over');});
+dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('over');if(e.dataTransfer.files[0])loadF(e.dataTransfer.files[0]);});
+fi.addEventListener('change',function(e){if(e.target.files[0])loadF(e.target.files[0]);});
 
-const XL_BORDER = {
-  top:    { style:'thin', color:{ argb:'FF000000' } },
-  bottom: { style:'thin', color:{ argb:'FF000000' } },
-  left:   { style:'thin', color:{ argb:'FF000000' } },
-  right:  { style:'thin', color:{ argb:'FF000000' } },
-};
-
-const SORT_ORDER = { pending:0, booked:1, in_transit:2, arrived:3 };
-const HEADERS    = ['HAWB','Lane Pair','RTX Business Unit','Status','Solution','MAWB'];
-const COL_WIDTHS = [9, 10, 29, 16, 62, 13];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// UTILITIES
-// ─────────────────────────────────────────────────────────────────────────────
-function getCode(v) {
-  if (!v) return '';
-  const s = String(v).trim();
-  if (!s || s === 'nan' || s === 'None') return '';
-  return s.length === 5 ? s.slice(2) : s.length > 3 ? s.slice(-3) : s;
-}
-
-function toDate(v) {
-  if (!v) return null;
-  if (v instanceof Date) return isNaN(v) ? null : v;
-  if (typeof v === 'number') {
-    const d = new Date((v - 25569) * 86400000);
-    return isNaN(d) ? null : d;
-  }
-  const d = new Date(String(v));
-  return isNaN(d) ? null : d;
-}
-
-function dateOnly(v) {
-  const d = toDate(v);
-  if (!d) return null;
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-function fmtDate(v) {
-  const d = toDate(v);
-  if (!d) return '';
-  return `${String(d.getUTCDate()).padStart(2,'0')}${MONTHS[d.getUTCMonth()]}${String(d.getUTCFullYear()).slice(-2)}`;
-}
-
-function fmtDatetime(v) {
-  const d = toDate(v);
-  if (!d) return '';
-  const dt = `${String(d.getUTCDate()).padStart(2,'0')}${MONTHS[d.getUTCMonth()]}${String(d.getUTCFullYear()).slice(-2)}`;
-  const tm = `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
-  return `${dt} ${tm}`;
-}
-
-function getBU(consignee) {
-  const cu = String(consignee || '').toUpperCase();
-  if (cu.includes('PRATT') && cu.includes('CANADA')) return 'Pratt & Whitney Canada';
-  if (cu.includes('PRATT'))                           return 'Pratt & Whitney US';
-  if (cu.includes('COLLINS') || cu.includes('HAMILTON SUNDSTRAND') || cu.includes('ROCKWELL COLLINS'))
-    return 'Collins Aerospace';
-  if (cu.includes('RAYTHEON')) return 'Raytheon';
-  return 'Collins Aerospace';
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LOGGING
-// ─────────────────────────────────────────────────────────────────────────────
-function log(msg, type = 'info') {
-  const p = document.getElementById('logPanel');
-  p.classList.add('visible');
-  const el = document.createElement('p');
-  el.className = `ll ${type}`;
-  el.textContent = msg;
-  p.appendChild(el);
-  p.scrollTop = p.scrollHeight;
-}
-function clearLog() {
-  const p = document.getElementById('logPanel');
-  p.innerHTML = ''; p.classList.remove('visible');
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FILE HANDLING
-// ─────────────────────────────────────────────────────────────────────────────
-const dropZone  = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
-
-dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault(); dropZone.classList.remove('drag-over');
-  const f = e.dataTransfer.files[0]; if (f) handleFile(f);
-});
-fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
-
-function handleFile(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      workbook = XLSX.read(e.target.result, { type:'array', cellDates:true });
-      if (!workbook.Sheets['mydhli_shipments']) {
-        alert('Sheet "mydhli_shipments" not found. Please check the file.');
-        return;
-      }
-      const range = XLSX.utils.decode_range(workbook.Sheets['mydhli_shipments']['!ref']);
-      const rowCount = Math.max(0, range.e.r - 10);
-
-      document.getElementById('fileName').textContent = file.name;
-      document.getElementById('fileMeta').textContent = `~${rowCount} data rows · ${(file.size/1024).toFixed(0)} KB`;
-      document.getElementById('fileLoaded').style.display = 'flex';
-      document.getElementById('dropZone').style.display = 'none';
-      document.getElementById('optionsPanel').classList.add('visible');
-      document.getElementById('buildRow').style.display = 'flex';
-
-      // Defaults
-      const base = file.name.replace(/\.[^.]+$/, '').replace('MEA_Report','DGF_MEA_Updates');
-      document.getElementById('outputName').value = base + '.xlsx';
-      const t = new Date();
-      document.getElementById('cutoffDate').value =
-        `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
-    } catch(err) { alert('Error reading file: ' + err.message); }
+function loadF(f){
+  var r=new FileReader();
+  r.onload=function(e){
+    try{
+      WB=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      if(!WB.Sheets['mydhli_shipments']){alert('Sheet "mydhli_shipments" not found.');return;}
+      var rng=XLSX.utils.decode_range(WB.Sheets['mydhli_shipments']['!ref']);
+      document.getElementById('fn').textContent=f.name;
+      document.getElementById('fm').textContent='~'+Math.max(0,rng.e.r-10)+' rows · '+(f.size/1024).toFixed(0)+' KB';
+      document.getElementById('fb').style.display='flex';
+      dz.style.display='none';
+      document.getElementById('opts').classList.add('on');
+      document.getElementById('br').classList.add('on');
+      var base=f.name.replace(/\.[^.]+$/,'').replace('MEA_Report','DGF_MEA_Updates');
+      document.getElementById('oname').value=base+'.xlsx';
+      var t=new Date();
+      document.getElementById('cut').value=t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)+'-'+('0'+t.getDate()).slice(-2);
+    }catch(err){alert('Error reading file: '+err.message);}
   };
-  reader.readAsArrayBuffer(file);
+  r.readAsArrayBuffer(f);
 }
 
-function clearFile() {
-  workbook = null; outputRows = [];
-  document.getElementById('fileLoaded').style.display = 'none';
-  document.getElementById('dropZone').style.display = 'block';
-  document.getElementById('optionsPanel').classList.remove('visible');
-  document.getElementById('buildRow').style.display = 'none';
-  document.getElementById('downloadBtn').style.display = 'none';
-  document.getElementById('previewPanel').classList.remove('visible');
-  document.getElementById('previewBody').innerHTML = '';
-  clearLog(); fileInput.value = '';
+function reset(){
+  WB=null;ROWS=[];
+  document.getElementById('fb').style.display='none';
+  dz.style.display='block';
+  document.getElementById('opts').classList.remove('on');
+  document.getElementById('br').classList.remove('on');
+  document.getElementById('dl').classList.remove('on');
+  document.getElementById('pv').classList.remove('on');
+  document.getElementById('tb').innerHTML='';
+  clg();fi.value='';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BUILD
-// ─────────────────────────────────────────────────────────────────────────────
-function buildReport() {
-  if (!workbook) return;
-  const btn = document.getElementById('buildBtn');
-  btn.classList.add('loading'); btn.disabled = true;
-  document.getElementById('downloadBtn').style.display = 'none';
-  document.getElementById('downloadBtn').disabled = true;
-  clearLog();
-  document.getElementById('previewPanel').classList.remove('visible');
-
-  setTimeout(() => {
-    try   { _doBuild(); }
-    catch (err) { log('ERROR: ' + err.message, 'error'); console.error(err); }
-    btn.classList.remove('loading'); btn.disabled = false;
-  }, 60);
+// ── Build ─────────────────────────────────────────────────────────────────
+function build(){
+  if(!WB)return;
+  var bb=document.getElementById('bb');
+  bb.classList.add('ld');bb.disabled=true;
+  document.getElementById('dl').classList.remove('on');
+  clg();document.getElementById('pv').classList.remove('on');
+  setTimeout(function(){try{_build();}catch(e){lg('ERROR: '+e.message,'e');console.error(e);}bb.classList.remove('ld');bb.disabled=false;},60);
 }
 
-function _doBuild() {
-  const cutoffStr = document.getElementById('cutoffDate').value;
-  const cutoff    = cutoffStr ? new Date(cutoffStr + 'T00:00:00Z') : new Date();
-  outputFile = (document.getElementById('outputName').value || 'DGF_MEA_Updates.xlsx').trim();
-  if (!outputFile.endsWith('.xlsx')) outputFile += '.xlsx';
+function _build(){
+  var cutStr=document.getElementById('cut').value;
+  var cut=cutStr?new Date(cutStr+'T00:00:00Z'):new Date();
+  FNAME=(document.getElementById('oname').value||'DGF_MEA_Updates.xlsx').trim();
+  if(!FNAME.endsWith('.xlsx'))FNAME+='.xlsx';
+  lg('▶ Building · cutoff: '+(cutStr||'today'),'b');
 
-  log(`▶ Build started  ·  cutoff: ${cutoffStr || 'today'}`, 'bold');
-
-  const sheet = workbook.Sheets['mydhli_shipments'];
-  const range = XLSX.utils.decode_range(sheet['!ref']);
-
-  // Map header row (row 10 = index 9)
-  const colMap = {};
-  for (let c = range.s.c; c <= range.e.c; c++) {
-    const cell = sheet[XLSX.utils.encode_cell({ r:9, c })];
-    if (cell && cell.v) colMap[String(cell.v)] = c;
+  var sheet=WB.Sheets['mydhli_shipments'];
+  var rng=XLSX.utils.decode_range(sheet['!ref']);
+  var cm={};
+  for(var c=rng.s.c;c<=rng.e.c;c++){
+    var cell=sheet[XLSX.utils.encode_cell({r:9,c:c})];
+    if(cell&&cell.v)cm[String(cell.v)]=c;
   }
-
-  const C = {
-    HAWB:    colMap['HouseBill'],
-    ORIG_CC: colMap['Origin Country/Region Code'],
-    DEST_CC: colMap['Destination Country/Region Code'],
-    CONS:    colMap['Consignee Name'],
-    MAWB:    colMap['MasterBill'],
-    AK:      colMap['Origin Code (First Leg)'],
-    AN:      colMap['Destination Code (First Leg)'],
-    AZ:      colMap['Destination Code (Last Leg)'],
-    AP:      colMap['Estimated Departure (First Leg)'],
-    AQ:      colMap['Actual Departure (First Leg)'],
-    BD:      colMap['Actual Departure (Last Leg)'],
-    BE:      colMap['Estimated Arrival (Last Leg)'],
-    BF:      colMap['Actual Arrival (Last Leg)'],
-    BJ:      colMap['Actual Arrival'],
+  var C={
+    HAWB:cm['HouseBill'],OCC:cm['Origin Country/Region Code'],DCC:cm['Destination Country/Region Code'],
+    CONS:cm['Consignee Name'],MAWB:cm['MasterBill'],
+    AK:cm['Origin Code (First Leg)'],AN:cm['Destination Code (First Leg)'],AZ:cm['Destination Code (Last Leg)'],
+    AP:cm['Estimated Departure (First Leg)'],AQ:cm['Actual Departure (First Leg)'],
+    BD:cm['Actual Departure (Last Leg)'],BE:cm['Estimated Arrival (Last Leg)'],
+    BF:cm['Actual Arrival (Last Leg)'],BJ:cm['Actual Arrival']
   };
+  var miss=Object.keys(C).filter(function(k){return C[k]==null;});
+  if(miss.length)lg('⚠ Columns not found: '+miss.join(', '),'w');
 
-  const missing = Object.entries(C).filter(([,v]) => v == null).map(([k]) => k);
-  if (missing.length) log(`⚠ Columns not found: ${missing.join(', ')}`, 'warn');
+  function cv(r,k){var c=C[k];if(c==null)return null;var cell=sheet[XLSX.utils.encode_cell({r:r,c:c})];return cell?(cell.v!==undefined?cell.v:null):null;}
 
-  function cv(r, key) {
-    const c = C[key]; if (c == null) return null;
-    const cell = sheet[XLSX.utils.encode_cell({ r, c })];
-    return cell ? (cell.v !== undefined ? cell.v : null) : null;
+  var rows=[],removed=0,total=0;
+  for(var r=10;r<=rng.e.r;r++){
+    var hawb=String(cv(r,'HAWB')||'').trim();if(!hawb)continue;
+    var oc=String(cv(r,'OCC')||'').toUpperCase(),dc=String(cv(r,'DCC')||'').toUpperCase();
+    if(!MEA.has(oc)&&!MEA.has(dc))continue;
+    total++;
+    var ap=cv(r,'AP'),aq=cv(r,'AQ'),bd=cv(r,'BD'),be=cv(r,'BE'),bf=cv(r,'BF'),bj=cv(r,'BJ');
+    var ak=gc(cv(r,'AK')),an=gc(cv(r,'AN')),az=gc(cv(r,'AZ'));
+    var dest=az||an;
+    var lane=(ak&&dest)?ak+'-'+dest:(ak||dest||'');
+    var mawb=String(cv(r,'MAWB')||'');
+    if(mawb.includes(','))mawb=mawb.split(',')[1].trim();
+    if(mawb=='nan'||mawb=='None')mawb='';
+    var bunit=getBU(cv(r,'CONS'));
+    var arr=bd||bf||bj;
+    var status,cat,sol;
+    if(arr){
+      var ad=d0(arr);
+      if(ad&&ad<cut){removed++;continue;}
+      status='Arrived';cat='arrived';sol='Arrived on '+fd(arr);
+    }else if(ap&&aq){
+      status='In Transit';cat='in_transit';
+      var eta=fdt(be);sol=(eta&&dest)?'Departed '+fd(aq)+', ETA to '+dest+' '+eta:'Departed '+fd(aq);
+    }else if(ap){
+      status='Booked';cat='booked';
+      var eta2=fdt(be);sol=(eta2&&dest)?'Booked for '+fd(ap)+', ETA to '+dest+' '+eta2:'Booked for '+fd(ap);
+    }else{status='Pending';cat='pending';sol='';}
+    rows.push({hawb:hawb,lane:lane,bu:bunit,status:status,sol:sol,mawb:mawb,cat:cat});
   }
 
-  const rows = [];
-  let removed = 0, meaTotal = 0;
-
-  for (let r = 10; r <= range.e.r; r++) {
-    const hawb = String(cv(r,'HAWB') || '').trim();
-    if (!hawb) continue;
-
-    const oc = String(cv(r,'ORIG_CC') || '').toUpperCase();
-    const dc = String(cv(r,'DEST_CC') || '').toUpperCase();
-    if (!MEA_CODES.has(oc) && !MEA_CODES.has(dc)) continue;
-    meaTotal++;
-
-    const ap = cv(r,'AP'), aq = cv(r,'AQ');
-    const bd = cv(r,'BD'), be = cv(r,'BE');
-    const bf = cv(r,'BF'), bj = cv(r,'BJ');
-    const ak = getCode(cv(r,'AK')), an = getCode(cv(r,'AN')), az = getCode(cv(r,'AZ'));
-    const dest = az || an;
-    const lane = (ak && dest) ? `${ak}-${dest}` : (ak || dest || '');
-
-    let mawb = String(cv(r,'MAWB') || '');
-    if (mawb.includes(',')) mawb = mawb.split(',')[1].trim();
-    if (mawb === 'nan' || mawb === 'None') mawb = '';
-
-    const bu     = getBU(cv(r,'CONS'));
-    const arrRaw = bd || bf || bj;
-    let status, cat, solution;
-
-    if (arrRaw) {
-      const arrDate = dateOnly(arrRaw);
-      if (arrDate && arrDate < cutoff) { removed++; continue; }
-      status = 'Arrived'; cat = 'arrived';
-      solution = `Arrived on ${fmtDate(arrRaw)}`;
-    } else if (ap && aq) {
-      status = 'In Transit'; cat = 'in_transit';
-      const eta = fmtDatetime(be);
-      solution = (eta && dest) ? `Departed ${fmtDate(aq)}, ETA to ${dest} ${eta}` : `Departed ${fmtDate(aq)}`;
-    } else if (ap) {
-      status = 'Booked'; cat = 'booked';
-      const eta = fmtDatetime(be);
-      solution = (eta && dest) ? `Booked for ${fmtDate(ap)}, ETA to ${dest} ${eta}` : `Booked for ${fmtDate(ap)}`;
-    } else {
-      status = 'Pending'; cat = 'pending'; solution = '';
-    }
-
-    rows.push({ hawb, lane, bu, status, solution, mawb, cat });
-  }
-
-  log(`  MEA rows found   : ${meaTotal}`, 'info');
-  log(`  Removed (pre-cutoff): ${removed}`, removed > 0 ? 'warn' : 'dim');
-
-  const isTLV = r => r.lane.includes('TLV');
-  const sort  = arr => arr.slice().sort((a,b) => SORT_ORDER[a.cat] - SORT_ORDER[b.cat]);
-
-  const nonTLV = sort(rows.filter(r => !isTLV(r)));
-  const tlv    = sort(rows.filter(r =>  isTLV(r)));
-  outputRows   = [...nonTLV, ...tlv];
-
-  const ct = { pending:0, booked:0, in_transit:0, arrived:0 };
-  rows.forEach(r => ct[r.cat]++);
-
-  log('', 'dim');
-  log(`  Non-TLV : ${nonTLV.length}  ·  TLV : ${tlv.length}  ·  Total : ${rows.length}`, 'bold');
-  log('', 'dim');
-  if (ct.pending)    log(`  🟠 Pending    : ${ct.pending}`,    'warn');
-  if (ct.booked)     log(`  🟢 Booked     : ${ct.booked}`,     'info');
-  if (ct.in_transit) log(`  🔵 In Transit : ${ct.in_transit}`, 'info');
-  if (ct.arrived)    log(`  ⬜ Arrived    : ${ct.arrived}`,    'dim');
-  log('', 'dim');
-  log('✓ Done — click Download to get your .xlsx', 'bold');
-
-  renderPreview(nonTLV, tlv, ct, rows.length);
-
-  const dlBtn = document.getElementById('downloadBtn');
-  dlBtn.style.display = 'flex'; dlBtn.disabled = false;
+  lg('  MEA: '+total+' · removed (pre-cutoff): '+removed,removed>0?'w':'d');
+  function isTLV(r){return r.lane.includes('TLV');}
+  function srt(a){return a.slice().sort(function(x,y){return ORD[x.cat]-ORD[y.cat];});}
+  var nTLV=srt(rows.filter(function(r){return!isTLV(r);}));
+  var tlv=srt(rows.filter(function(r){return isTLV(r);}));
+  ROWS=rows;
+  var ct={pending:0,booked:0,in_transit:0,arrived:0};
+  rows.forEach(function(r){ct[r.cat]++;});
+  lg('  Non-TLV: '+nTLV.length+' · TLV: '+tlv.length+' · Total: '+rows.length,'b');
+  if(ct.pending)lg('  🟠 Pending: '+ct.pending,'w');
+  if(ct.booked)lg('  🟢 Booked: '+ct.booked);
+  if(ct.in_transit)lg('  🔵 In Transit: '+ct.in_transit);
+  if(ct.arrived)lg('  ⬜ Arrived: '+ct.arrived,'d');
+  lg('✓ Ready — click Download','b');
+  renderPrev(nTLV,tlv,ct,rows.length);
+  document.getElementById('dl').classList.add('on');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PREVIEW
-// ─────────────────────────────────────────────────────────────────────────────
-function renderPreview(nonTLV, tlv, ct, total) {
-  const tbody = document.getElementById('previewBody');
-  tbody.innerHTML = '';
-
-  const secHdr = label => {
-    const tr = document.createElement('tr');
-    tr.className = 'row-sec-hdr';
-    const td = document.createElement('td');
-    td.colSpan = 6; td.textContent = label;
-    tr.appendChild(td); return tr;
-  };
-
-  const dataRow = r => {
-    const tr = document.createElement('tr');
-    tr.className = r.cat === 'in_transit' ? 'row-transit' : `row-${r.cat}`;
-    const pillCls = { pending:'pill-pending', booked:'pill-booked', in_transit:'pill-transit', arrived:'pill-arrived' }[r.cat];
-    [r.hawb, r.lane, r.bu, `<span class="pill ${pillCls}">${r.status}</span>`, r.solution, r.mawb].forEach((v,i) => {
-      const td = document.createElement('td');
-      if (i === 3) td.innerHTML = v; else { td.textContent = v||''; if (i===4){ td.style.maxWidth='320px'; td.style.fontSize='11px'; } }
+// ── Preview ───────────────────────────────────────────────────────────────
+function renderPrev(nTLV,tlv,ct,total){
+  var tb=document.getElementById('tb');tb.innerHTML='';
+  function sh(label){var tr=document.createElement('tr');tr.className='rh';var td=document.createElement('td');td.colSpan=6;td.textContent=label;tr.appendChild(td);return tr;}
+  function dr(r){
+    var tr=document.createElement('tr');
+    tr.className={pending:'rp',booked:'rg',in_transit:'rb',arrived:'ra'}[r.cat];
+    var pc={pending:'pp',booked:'pg',in_transit:'pb',arrived:'pa'}[r.cat];
+    [r.hawb,r.lane,r.bu,'<span class="pill '+pc+'">'+r.status+'</span>',r.sol,r.mawb].forEach(function(v,i){
+      var td=document.createElement('td');
+      if(i==3)td.innerHTML=v;else{td.textContent=v||'';if(i==4){td.style.maxWidth='300px';td.style.fontSize='11px';}}
       tr.appendChild(td);
-    }); return tr;
-  };
-
-  tbody.appendChild(secHdr(`Non-TLV Lanes — ${nonTLV.length} rows`));
-  nonTLV.forEach(r => tbody.appendChild(dataRow(r)));
-  tbody.appendChild(secHdr(`TLV Lanes — ${tlv.length} rows`));
-  tlv.forEach(r => tbody.appendChild(dataRow(r)));
-
-  document.getElementById('statsRow').innerHTML = `
-    <span class="chip chip-total"><span class="dot" style="background:var(--text)"></span>${total} rows</span>
-    ${ct.pending    ? `<span class="chip chip-pending"><span class="dot"></span>${ct.pending} Pending</span>`       : ''}
-    ${ct.booked     ? `<span class="chip chip-booked"><span class="dot"></span>${ct.booked} Booked</span>`          : ''}
-    ${ct.in_transit ? `<span class="chip chip-transit"><span class="dot"></span>${ct.in_transit} In Transit</span>` : ''}
-    ${ct.arrived    ? `<span class="chip chip-arrived"><span class="dot"></span>${ct.arrived} Arrived</span>`       : ''}
-  `;
-  document.getElementById('previewTitle').textContent = `Preview — ${outputFile}`;
-  document.getElementById('previewPanel').classList.add('visible');
+    });return tr;
+  }
+  tb.appendChild(sh('Non-TLV Lanes — '+nTLV.length+' rows'));nTLV.forEach(function(r){tb.appendChild(dr(r));});
+  tb.appendChild(sh('TLV Lanes — '+tlv.length+' rows'));tlv.forEach(function(r){tb.appendChild(dr(r));});
+  document.getElementById('chips').innerHTML=
+    '<span class="chip chtot"><span class="cd" style="background:var(--ink)"></span>'+total+' rows</span>'+
+    (ct.pending?'<span class="chip chp"><span class="cd"></span>'+ct.pending+' Pending</span>':'')+
+    (ct.booked?'<span class="chip chg"><span class="cd"></span>'+ct.booked+' Booked</span>':'')+
+    (ct.in_transit?'<span class="chip chb"><span class="cd"></span>'+ct.in_transit+' In Transit</span>':'')+
+    (ct.arrived?'<span class="chip cha"><span class="cd"></span>'+ct.arrived+' Arrived</span>':'');
+  document.getElementById('pvt').textContent='Preview — '+FNAME;
+  document.getElementById('pv').classList.add('on');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DOWNLOAD — uses ExcelJS for full colour/style support
-// ─────────────────────────────────────────────────────────────────────────────
-async function downloadReport() {
-  if (!outputRows.length) return;
+// ═══════════════════════════════════════════════════════════════════════════
+// XLSX WRITER — hand-built XML inside a ZIP
+// No ExcelJS. No SheetJS write. Pure browser APIs only.
+// This guarantees colours survive on every host including Vercel.
+// ═══════════════════════════════════════════════════════════════════════════
 
-  const dlBtn = document.getElementById('downloadBtn');
-  dlBtn.disabled = true;
-  dlBtn.textContent = '⏳ Generating…';
+function download(){
+  if(!ROWS.length)return;
+  var dl=document.getElementById('dl');
+  dl.disabled=true;dl.textContent='⏳ Generating…';
 
-  try {
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Updates');
+  setTimeout(function(){
+    try{
+      var blob=buildXLSX();
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;a.download=FNAME;
+      document.body.appendChild(a);a.click();
+      setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1000);
+      lg('⬇ Downloaded: '+FNAME,'b');
+    }catch(e){lg('Download error: '+e.message,'e');console.error(e);}
+    dl.disabled=false;dl.textContent='⬇ Download .xlsx';
+  },30);
+}
 
-    // Column widths
-    ws.columns = HEADERS.map((h, i) => ({ header: h, width: COL_WIDTHS[i] }));
-    ws.getRow(1).values = []; // clear auto-set header row — we'll write manually
+// ── Colour definitions (ARGB) ─────────────────────────────────────────────
+var COLORS={
+  hdrBg:'FF2D2D2D',   // dark grey header background
+  hdrFg:'FFFFFFFF',   // white header text
+  pending:'FFFFC000', // orange
+  booked:'FF92D050',  // green
+  in_transit:'FFBDD7EE', // blue
+  arrived:'00000000', // transparent = no fill
+  dataFg:'FF000000'   // black data text
+};
 
-    const isTLV  = r => r.lane.includes('TLV');
-    const nonTLV = outputRows.filter(r => !isTLV(r));
-    const tlv    = outputRows.filter(r =>  isTLV(r));
+// ── Main builder ──────────────────────────────────────────────────────────
+function buildXLSX(){
+  // Split rows into sections
+  function isTLV(r){return r.lane.includes('TLV');}
+  function srt(a){return a.slice().sort(function(x,y){return ORD[x.cat]-ORD[y.cat];});}
+  var nTLV=srt(ROWS.filter(function(r){return!isTLV(r);}));
+  var tlvR=srt(ROWS.filter(function(r){return isTLV(r);}));
 
-    let currentRow = 1;
-    let filterRowNumber = -1;
-
-    // ── Helper: style a row ───────────────────────────────────────────────
-    function styleRow(xlRow, fillKey, isHeader) {
-      xlRow.eachCell({ includeEmpty: true }, cell => {
-        cell.font   = isHeader ? { ...XL_FONT_HDR } : { ...XL_FONT_DATA };
-        cell.fill   = { ...XL_FILLS[fillKey] };
-        cell.border = { ...XL_BORDER };
-        cell.alignment = { vertical: 'middle', wrapText: false };
-      });
-      xlRow.height = 16;
-    }
-
-    // ── Write header row ──────────────────────────────────────────────────
-    function writeHeader(isFilterRow) {
-      const row = ws.getRow(currentRow);
-      row.values = HEADERS;
-      styleRow(row, 'header', true);
-      if (isFilterRow) filterRowNumber = currentRow;
-      row.commit();
-      currentRow++;
-    }
-
-    // ── Write data row ────────────────────────────────────────────────────
-    function writeDataRow(r) {
-      const row = ws.getRow(currentRow);
-      row.values = [r.hawb, r.lane, r.bu, r.status, r.solution, r.mawb];
-      styleRow(row, r.cat, false);
-      row.commit();
-      currentRow++;
-    }
-
-    // Section 1: Non-TLV
-    writeHeader(false);
-    nonTLV.forEach(r => writeDataRow(r));
-
-    // Section 2: TLV (with auto-filter)
-    writeHeader(true);
-    tlv.forEach(r => writeDataRow(r));
-
-    // Auto-filter on TLV header row
-    if (filterRowNumber > 0) {
-      ws.autoFilter = {
-        from: { row: filterRowNumber, column: 1 },
-        to:   { row: filterRowNumber, column: 6 },
-      };
-    }
-
-    // Generate and save
-    const buffer = await wb.xlsx.writeBuffer();
-    const blob   = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, outputFile);
-
-    log(`⬇ Downloaded: ${outputFile}`, 'bold');
-  } catch(err) {
-    log('Download error: ' + err.message, 'error');
-    console.error(err);
+  // Build shared strings table
+  var strs=[],strIdx={};
+  function si(s){
+    s=String(s||'');
+    if(strIdx[s]!==undefined)return strIdx[s];
+    strIdx[s]=strs.length;strs.push(s);return strs.length-1;
   }
 
-  dlBtn.disabled = false;
-  dlBtn.innerHTML = '⬇ Download .xlsx';
+  // Column widths
+  var colW=[9,10,29,16,62,13];
+
+  // Style indices (defined in styleXML below — must match order)
+  // 0=header, 1=pending, 2=booked, 3=in_transit, 4=arrived
+  var SIDX={header:0,pending:1,booked:2,in_transit:3,arrived:4};
+
+  // Build rows data
+  var sheetRows=[];
+  var filterRow=-1; // 1-based row number for autofilter
+
+  function pushHeader(isFilter){
+    var cells=['HAWB','Lane Pair','RTX Business Unit','Status','Solution','MAWB'];
+    sheetRows.push({cells:cells.map(function(v){return{si:si(v),style:SIDX.header};}),height:18});
+    if(isFilter)filterRow=sheetRows.length;
+  }
+  function pushDataRow(r){
+    var vals=[r.hawb,r.lane,r.bu,r.status,r.sol,r.mawb];
+    var s=SIDX[r.cat]!==undefined?SIDX[r.cat]:SIDX.arrived;
+    sheetRows.push({cells:vals.map(function(v){return{si:si(v),style:s};}),height:15});
+  }
+
+  pushHeader(false);
+  nTLV.forEach(pushDataRow);
+  pushHeader(true);
+  tlvR.forEach(pushDataRow);
+
+  // ── XML parts ──────────────────────────────────────────────────────────
+
+  // [Content_Types].xml
+  var contentTypes='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    +'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    +'<Default Extension="xml" ContentType="application/xml"/>'
+    +'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+    +'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+    +'<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'
+    +'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+    +'</Types>';
+
+  // _rels/.rels
+  var rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+    +'</Relationships>';
+
+  // xl/_rels/workbook.xml.rels
+  var wbRels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+    +'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>'
+    +'<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+    +'</Relationships>';
+
+  // xl/workbook.xml
+  var workbook='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+    +'<sheets><sheet name="Updates" sheetId="1" r:id="rId1"/></sheets>'
+    +'</workbook>';
+
+  // xl/sharedStrings.xml
+  var ssXML='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="'+strs.length+'" uniqueCount="'+strs.length+'">'
+    +strs.map(function(s){return'<si><t xml:space="preserve">'+xe(s)+'</t></si>';}).join('')
+    +'</sst>';
+
+  // xl/styles.xml
+  // Defines 5 xf styles: 0=header, 1=pending(orange), 2=booked(green), 3=in_transit(blue), 4=arrived(none)
+  var stylesXML='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+
+    // fonts: 0=data black, 1=header white bold
+    +'<fonts count="2">'
+    +'<font><sz val="11"/><name val="Aptos Narrow"/><color rgb="FF000000"/></font>'
+    +'<font><sz val="11"/><name val="Aptos Narrow"/><b/><color rgb="FFFFFFFF"/></font>'
+    +'</fonts>'
+
+    // fills: 0=none(required), 1=gray(required), 2=pending orange, 3=booked green, 4=transit blue, 5=arrived none
+    +'<fills count="6">'
+    +'<fill><patternFill patternType="none"/></fill>'
+    +'<fill><patternFill patternType="gray125"/></fill>'
+    +'<fill><patternFill patternType="solid"><fgColor rgb="'+COLORS.pending+'"/><bgColor indexed="64"/></patternFill></fill>'
+    +'<fill><patternFill patternType="solid"><fgColor rgb="'+COLORS.booked+'"/><bgColor indexed="64"/></patternFill></fill>'
+    +'<fill><patternFill patternType="solid"><fgColor rgb="'+COLORS.in_transit+'"/><bgColor indexed="64"/></patternFill></fill>'
+    +'<fill><patternFill patternType="none"/></fill>'
+    +'</fills>'
+
+    // borders: 0=none, 1=thin all sides
+    +'<borders count="2">'
+    +'<border><left/><right/><top/><bottom/><diagonal/></border>'
+    +'<border>'
+    +'<left style="thin"><color rgb="FF000000"/></left>'
+    +'<right style="thin"><color rgb="FF000000"/></right>'
+    +'<top style="thin"><color rgb="FF000000"/></top>'
+    +'<bottom style="thin"><color rgb="FF000000"/></bottom>'
+    +'<diagonal/>'
+    +'</border>'
+    +'</borders>'
+
+    +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+
+    // xf table: must match SIDX order above
+    // 0=header(font1,fill_hdr via patternFill dark), 1=pending, 2=booked, 3=transit, 4=arrived
+    // Header: we use a separate fill — add it as fill index 6
+    // Actually let me re-index fills properly:
+    // fill 0=none, 1=gray125, 2=orange(pending), 3=green(booked), 4=blue(transit), 5=none(arrived)
+    // For header dark bg, add fill 6
+    // ... rebuild fills with header included:
+
+    // xf 0 = header (font1/bold-white, fill=dark header, border=thin)
+    // xf 1 = pending (font0, fill=orange, border=thin)
+    // xf 2 = booked  (font0, fill=green,  border=thin)
+    // xf 3 = transit (font0, fill=blue,   border=thin)
+    // xf 4 = arrived (font0, fill=none,   border=thin)
+    +'<cellXfs count="5">'
+    +'<xf numFmtId="0" fontId="1" fillId="6" borderId="1" xfId="0"><alignment vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0"><alignment vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0"><alignment vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0"><alignment vertical="center"/></xf>'
+    +'<xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0"><alignment vertical="center"/></xf>'
+    +'</cellXfs>'
+    +'</styleSheet>';
+
+  // Wait — fill index 6 referenced but only 6 defined (0-5). Fix: add header fill as index 6.
+  stylesXML=stylesXML.replace(
+    '<fills count="6">',
+    '<fills count="7">'
+  ).replace(
+    '</fills>',
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF2D2D2D"/><bgColor indexed="64"/></patternFill></fill></fills>'
+  );
+
+  // xl/worksheets/sheet1.xml
+  var COLS='<cols>';
+  colW.forEach(function(w,i){COLS+='<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>';});
+  COLS+='</cols>';
+
+  var sheetData='<sheetData>';
+  sheetRows.forEach(function(row,ri){
+    sheetData+='<row r="'+(ri+1)+'" ht="'+row.height+'" customHeight="1">';
+    row.cells.forEach(function(cell,ci){
+      var col=String.fromCharCode(65+ci); // A-F
+      var addr=col+(ri+1);
+      sheetData+='<c r="'+addr+'" t="s" s="'+cell.style+'"><v>'+cell.si+'</v></c>';
+    });
+    sheetData+='</row>';
+  });
+  sheetData+='</sheetData>';
+
+  // autoFilter on TLV header row
+  var autoFilter='';
+  if(filterRow>0){
+    autoFilter='<autoFilter ref="A'+filterRow+':F'+filterRow+'"/>';
+  }
+
+  var sheetXML='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    +COLS
+    +sheetData
+    +autoFilter
+    +'</worksheet>';
+
+  // ── Assemble ZIP using base64 + browser Blob trick ─────────────────────
+  // We'll build the ZIP binary manually.
+  // Using a minimal synchronous ZIP writer (no library needed):
+  var files={
+    '[Content_Types].xml':contentTypes,
+    '_rels/.rels':rels,
+    'xl/_rels/workbook.xml.rels':wbRels,
+    'xl/workbook.xml':workbook,
+    'xl/sharedStrings.xml':ssXML,
+    'xl/styles.xml':stylesXML,
+    'xl/worksheets/sheet1.xml':sheetXML
+  };
+
+  return zipFiles(files);
+}
+
+// ── Minimal synchronous ZIP builder ──────────────────────────────────────
+// Implements the ZIP local file header + central directory spec (PKZIP 2.0).
+// Uses STORED (no compression) for simplicity and reliability.
+function zipFiles(files){
+  var parts=[];
+  var centralDir=[];
+  var offset=0;
+
+  function strToBytes(s){
+    var arr=new Uint8Array(s.length);
+    for(var i=0;i<s.length;i++)arr[i]=s.charCodeAt(i)&0xff;
+    return arr;
+  }
+
+  function utf8Bytes(s){
+    return new TextEncoder().encode(s);
+  }
+
+  function u16le(n){return new Uint8Array([n&0xff,(n>>8)&0xff]);}
+  function u32le(n){return new Uint8Array([n&0xff,(n>>8)&0xff,(n>>16)&0xff,(n>>24)&0xff]);}
+
+  function concat(){
+    var arrays=Array.prototype.slice.call(arguments);
+    var total=arrays.reduce(function(s,a){return s+a.length;},0);
+    var out=new Uint8Array(total);var pos=0;
+    arrays.forEach(function(a){out.set(a,pos);pos+=a.length;});
+    return out;
+  }
+
+  function crc32(data){
+    var table=new Uint32Array(256);
+    for(var i=0;i<256;i++){var c=i;for(var j=0;j<8;j++)c=c&1?(0xEDB88320^(c>>>1)):c>>>1;table[i]=c;}
+    var crc=0xFFFFFFFF;
+    for(var k=0;k<data.length;k++)crc=table[(crc^data[k])&0xff]^(crc>>>8);
+    return(crc^0xFFFFFFFF)>>>0;
+  }
+
+  Object.keys(files).forEach(function(name){
+    var content=utf8Bytes(files[name]);
+    var nameBuf=utf8Bytes(name);
+    var crc=crc32(content);
+    var size=content.length;
+
+    // Local file header
+    var lfh=concat(
+      new Uint8Array([0x50,0x4B,0x03,0x04]), // signature
+      u16le(20),   // version needed
+      u16le(0),    // flags
+      u16le(0),    // compression: STORED
+      u16le(0),    // mod time
+      u16le(0),    // mod date
+      u32le(crc),
+      u32le(size), // compressed size
+      u32le(size), // uncompressed size
+      u16le(nameBuf.length),
+      u16le(0)     // extra length
+    );
+
+    parts.push(lfh);
+    parts.push(nameBuf);
+    parts.push(content);
+
+    // Central directory entry
+    var cde=concat(
+      new Uint8Array([0x50,0x4B,0x01,0x02]), // signature
+      u16le(20),   // version made by
+      u16le(20),   // version needed
+      u16le(0),    // flags
+      u16le(0),    // compression
+      u16le(0),    // mod time
+      u16le(0),    // mod date
+      u32le(crc),
+      u32le(size),
+      u32le(size),
+      u16le(nameBuf.length),
+      u16le(0),    // extra length
+      u16le(0),    // comment length
+      u16le(0),    // disk start
+      u16le(0),    // internal attrs
+      u32le(0),    // external attrs
+      u32le(offset)
+    );
+
+    centralDir.push(cde);
+    centralDir.push(nameBuf);
+
+    offset+=lfh.length+nameBuf.length+content.length;
+  });
+
+  var cdStart=offset;
+  var allParts=parts.concat(centralDir);
+  var cdSize=centralDir.reduce(function(s,a){return s+a.length;},0);
+
+  // End of central directory
+  var eocd=concat(
+    new Uint8Array([0x50,0x4B,0x05,0x06]), // signature
+    u16le(0),                    // disk number
+    u16le(0),                    // disk with CD start
+    u16le(Object.keys(files).length),
+    u16le(Object.keys(files).length),
+    u32le(cdSize),
+    u32le(cdStart),
+    u16le(0)                     // comment length
+  );
+  allParts.push(eocd);
+
+  // Merge all Uint8Arrays into one
+  var totalSize=allParts.reduce(function(s,a){return s+a.length;},0);
+  var final=new Uint8Array(totalSize);var pos=0;
+  allParts.forEach(function(a){final.set(a,pos);pos+=a.length;});
+
+  return new Blob([final],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 </script>
 
