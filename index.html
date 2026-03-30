@@ -6,13 +6,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MEA Report Builder</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- SheetJS for reading xlsx -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- ExcelJS for writing xlsx with full style support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<!-- FileSaver for download -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
   --bg: #f5f4f0; --surface: #ffffff; --surface2: #eeece7;
   --border: #d8d5cc; --border2: #c8c4b8; --text: #1a1916;
-  --muted: #6b6760; --dim: #a09d96; --accent: #1a1916;
+  --muted: #6b6760; --dim: #a09d96;
   --pending: #d97706; --pending-bg: #fef3c7; --pending-border: #fcd34d;
   --booked: #16a34a; --booked-bg: #dcfce7; --booked-border: #86efac;
   --transit: #1d4ed8; --transit-bg: #dbeafe; --transit-border: #93c5fd;
@@ -21,26 +26,30 @@
 }
 html, body { min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; }
 .app { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
-header { background: var(--text); color: var(--bg); padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+
+/* Header */
+header { background: var(–text); color: var(–bg); padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
 .header-left { display: flex; align-items: center; gap: 16px; }
-.header-logo { width: 30px; height: 30px; background: var(--bg); clip-path: polygon(0 0,100% 0,100% 70%,70% 100%,0 100%); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700; font-size: 10px; color: var(--text); flex-shrink: 0; }
+.header-logo { width: 30px; height: 30px; background: var(–bg); clip-path: polygon(0 0,100% 0,100% 70%,70% 100%,0 100%); display: flex; align-items: center; justify-content: center; font-family: var(–mono); font-weight: 700; font-size: 10px; color: var(–text); }
 .header-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.2); }
-.header-title { font-family: var(--mono); font-weight: 500; font-size: 13px; }
-.header-sub { font-size: 11px; color: rgba(255,255,255,0.45); font-family: var(--mono); }
-.header-right { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,0.4); }
+.header-title { font-family: var(–mono); font-weight: 500; font-size: 13px; }
+.header-sub { font-size: 11px; color: rgba(255,255,255,0.45); font-family: var(–mono); }
+.header-right { display: flex; align-items: center; gap: 8px; font-family: var(–mono); font-size: 11px; color: rgba(255,255,255,0.4); }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; animation: blink 2s ease-in-out infinite; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* Main */
 main { padding: 40px 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
 
-/* Upload */
+/* Upload zone */
 .upload-zone { border: 2px dashed var(–border2); border-radius: 8px; background: var(–surface); padding: 56px 32px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
 .upload-zone::before { content:’’; position:absolute; inset:0; background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(0,0,0,0.015) 10px,rgba(0,0,0,0.015) 20px); pointer-events:none; }
-.upload-zone:hover, .upload-zone.drag-over { border-color: var(–accent); background: var(–surface2); }
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(–text); background: var(–surface2); }
 .upload-zone input[type=“file”] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
 .upload-icon { width:48px; height:48px; margin:0 auto 16px; background:var(–surface2); border:1px solid var(–border); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:22px; }
 .upload-title { font-family:var(–mono); font-weight:600; font-size:15px; margin-bottom:6px; }
 .upload-sub { font-size:12px; color:var(–muted); font-family:var(–mono); }
-.upload-accepted { margin-top:12px; font-size:11px; color:var(–dim); font-family:var(–mono); }
+.upload-hint { margin-top:12px; font-size:11px; color:var(–dim); font-family:var(–mono); }
 
 /* File loaded */
 .file-loaded { display:flex; align-items:center; justify-content:space-between; background:var(–surface); border:1px solid var(–border); border-radius:8px; padding:16px 20px; margin-top:16px; animation:slideIn 0.3s ease; }
@@ -50,77 +59,78 @@ main { padding: 40px 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
 .file-name { font-family:var(–mono); font-weight:500; font-size:13px; }
 .file-meta { font-size:11px; color:var(–muted); font-family:var(–mono); margin-top:2px; }
 .btn-clear { background:none; border:1px solid var(–border2); border-radius:4px; padding:6px 12px; font-family:var(–mono); font-size:11px; color:var(–muted); cursor:pointer; transition:all 0.15s; }
-.btn-clear:hover { border-color:var(–accent); color:var(–accent); }
+.btn-clear:hover { border-color:var(–text); color:var(–text); }
 
 /* Options */
 .options-panel { background:var(–surface); border:1px solid var(–border); border-radius:8px; padding:24px; margin-top:20px; display:none; animation:slideIn 0.3s ease; }
 .options-panel.visible { display:block; }
-.options-title { font-family:var(–mono); font-weight:600; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(–muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.options-title { font-family:var(–mono); font-weight:600; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(–muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
 .options-title::after { content:’’; flex:1; height:1px; background:var(–border); }
 .options-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
-.option-field label { display:block; font-family:var(–mono); font-size:11px; color:var(–muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px; }
+.option-field label { display:block; font-family:var(–mono); font-size:10px; color:var(–muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px; }
 .option-field input { width:100%; background:var(–bg); border:1px solid var(–border2); border-radius:4px; padding:8px 10px; font-family:var(–mono); font-size:12px; color:var(–text); transition:border-color 0.15s; }
-.option-field input:focus { outline:none; border-color:var(–accent); }
+.option-field input:focus { outline:none; border-color:var(–text); }
 
-/* Build button */
-.build-row { margin-top:20px; display:flex; gap:12px; align-items:center; }
+/* Buttons */
+.build-row { margin-top:20px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 .btn-build { background:var(–text); color:var(–bg); border:none; border-radius:6px; padding:12px 28px; font-family:var(–mono); font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:opacity 0.15s; }
-.btn-build:hover { opacity:0.85; }
-.btn-build:disabled { opacity:0.4; cursor:not-allowed; }
+.btn-build:hover { opacity:0.82; }
+.btn-build:disabled { opacity:0.35; cursor:not-allowed; }
 .spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite; display:none; }
 .btn-build.loading .spinner { display:block; }
 .btn-build.loading .btn-label { display:none; }
 @keyframes spin { to{transform:rotate(360deg)} }
 .build-hint { font-size:11px; color:var(–dim); font-family:var(–mono); }
+.btn-download { background:#16a34a; color:white; border:none; border-radius:6px; padding:12px 24px; font-family:var(–mono); font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.15s; }
+.btn-download:hover { background:#15803d; }
+.btn-download:disabled { opacity:0.4; cursor:not-allowed; }
 
 /* Log */
-.log-panel { background:var(–text); color:#a0f0a0; border-radius:8px; padding:20px; margin-top:20px; font-family:var(–mono); font-size:12px; line-height:1.8; min-height:80px; display:none; animation:slideIn 0.3s ease; max-height:260px; overflow-y:auto; }
+.log-panel { background:#111; color:#a0f0a0; border-radius:8px; padding:20px; margin-top:20px; font-family:var(–mono); font-size:12px; line-height:1.9; min-height:60px; max-height:240px; overflow-y:auto; display:none; animation:slideIn 0.3s ease; }
 .log-panel.visible { display:block; }
-.log-line.warn { color:#fcd34d; } .log-line.error { color:#f87171; } .log-line.dim { color:#4b5563; } .log-line.bold { color:#ffffff; font-weight:600; }
+.ll { margin:0; } .ll.warn{color:#fcd34d;} .ll.error{color:#f87171;} .ll.dim{color:#374151;} .ll.bold{color:#fff;font-weight:600;}
 
 /* Preview */
-.preview-panel { margin-top:24px; display:none; animation:slideIn 0.3s ease; }
+.preview-panel { margin-top:28px; display:none; animation:slideIn 0.3s ease; }
 .preview-panel.visible { display:block; }
-.preview-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+.preview-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
 .preview-title { font-family:var(–mono); font-weight:600; font-size:13px; }
-.btn-download { background:#16a34a; color:white; border:none; border-radius:5px; padding:10px 22px; font-family:var(–mono); font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.15s; }
-.btn-download:hover { background:#15803d; }
-.stats-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
-.stat-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-family:var(–mono); font-size:11px; font-weight:500; }
-.stat-chip .dot { width:7px; height:7px; border-radius:50%; }
-.stat-pending { background:var(–pending-bg); color:var(–pending); border:1px solid var(–pending-border); }
-.stat-pending .dot { background:var(–pending); }
-.stat-booked { background:var(–booked-bg); color:var(–booked); border:1px solid var(–booked-border); }
-.stat-booked .dot { background:var(–booked); }
-.stat-transit { background:var(–transit-bg); color:var(–transit); border:1px solid var(–transit-border); }
-.stat-transit .dot { background:var(–transit); }
-.stat-arrived { background:var(–arrived-bg); color:var(–muted); border:1px solid var(–arrived-border); }
-.stat-arrived .dot { background:var(–muted); }
-.stat-total { background:var(–surface2); color:var(–text); border:1px solid var(–border); }
+.stats-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+.chip { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-family:var(–mono); font-size:11px; font-weight:500; }
+.chip .dot { width:7px; height:7px; border-radius:50%; }
+.chip-total   { background:var(–surface2); color:var(–text); border:1px solid var(–border); }
+.chip-pending { background:var(–pending-bg); color:var(–pending); border:1px solid var(–pending-border); }
+.chip-pending .dot { background:var(–pending); }
+.chip-booked  { background:var(–booked-bg); color:var(–booked); border:1px solid var(–booked-border); }
+.chip-booked .dot  { background:var(–booked); }
+.chip-transit { background:var(–transit-bg); color:var(–transit); border:1px solid var(–transit-border); }
+.chip-transit .dot { background:var(–transit); }
+.chip-arrived { background:var(–arrived-bg); color:var(–muted); border:1px solid var(–arrived-border); }
+.chip-arrived .dot { background:var(–muted); }
+
 .tbl-wrap { overflow-x:auto; border-radius:6px; border:1px solid var(–border); }
 .preview-table { width:100%; border-collapse:collapse; font-size:12px; font-family:var(–mono); }
 .preview-table thead tr { background:var(–text); color:var(–bg); }
 .preview-table th { padding:10px 12px; text-align:left; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; white-space:nowrap; font-weight:600; }
 .preview-table td { padding:8px 12px; border-bottom:1px solid var(–border); vertical-align:middle; }
 .preview-table tbody tr:last-child td { border-bottom:none; }
-.preview-table tbody tr:hover td { filter:brightness(0.97); }
-.row-pending td { background:var(–pending-bg); }
+.row-pending td  { background:var(–pending-bg); }
 .row-pending td:first-child { border-left:3px solid var(–pending); }
-.row-booked td { background:var(–booked-bg); }
-.row-booked td:first-child { border-left:3px solid var(–booked); }
-.row-transit td { background:var(–transit-bg); }
+.row-booked td   { background:var(–booked-bg); }
+.row-booked td:first-child  { border-left:3px solid var(–booked); }
+.row-transit td  { background:var(–transit-bg); }
 .row-transit td:first-child { border-left:3px solid var(–transit); }
-.row-arrived td { background:var(–arrived-bg); }
+.row-arrived td  { background:var(–arrived-bg); }
 .row-arrived td:first-child { border-left:3px solid var(–arrived-border); }
-.row-section-header td { background:#1a1916; color:#f5f4f0; font-weight:600; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 12px; }
-.pill-status { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-weight:600; white-space:nowrap; }
+.row-sec-hdr td  { background:#1a1916; color:#f5f4f0; font-weight:600; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 12px; }
+.pill { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-weight:600; white-space:nowrap; }
 .pill-pending { background:var(–pending-bg); color:var(–pending); border:1px solid var(–pending-border); }
 .pill-booked  { background:var(–booked-bg);  color:var(–booked);  border:1px solid var(–booked-border); }
 .pill-transit { background:var(–transit-bg); color:var(–transit); border:1px solid var(–transit-border); }
 .pill-arrived { background:var(–arrived-bg); color:var(–muted);   border:1px solid var(–arrived-border); }
 
 footer { border-top:1px solid var(–border); padding:14px 32px; font-family:var(–mono); font-size:11px; color:var(–dim); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
-@media(max-width:640px){ main{padding:24px 16px;} header{padding:0 16px;} footer{padding:12px 16px;} }
+@media(max-width:640px){ main{padding:24px 16px;} header{padding:0 16px;} footer{padding:12px 16px;} .header-sub{display:none;} }
 </style>
 
 </head>
@@ -133,7 +143,7 @@ footer { border-top:1px solid var(–border); padding:14px 32px; font-family:var
     <div class="header-sep"></div>
     <div class="header-title">MEA Report Builder</div>
     <div class="header-sep"></div>
-    <div class="header-sub">mydhli → DGF Updates format</div>
+    <div class="header-sub">mydhli export → DGF Updates format</div>
   </div>
   <div class="header-right">
     <div class="status-dot"></div>
@@ -142,20 +152,21 @@ footer { border-top:1px solid var(–border); padding:14px 32px; font-family:var
 </header>
 
 <main>
+  <!-- Upload -->
   <div class="upload-zone" id="dropZone">
     <input type="file" id="fileInput" accept=".xlsx,.xls" />
     <div class="upload-icon">📊</div>
     <div class="upload-title">Drop your MEA Report here</div>
     <div class="upload-sub">or click to browse</div>
-    <div class="upload-accepted">Accepts: mydhli_shipments .xlsx export · Header on row 10</div>
+    <div class="upload-hint">Accepts mydhli_shipments .xlsx · Header row 10 · Data from row 11</div>
   </div>
 
   <div class="file-loaded" id="fileLoaded" style="display:none">
     <div class="file-info">
       <div class="file-icon">✓</div>
       <div>
-        <div class="file-name" id="fileName">—</div>
-        <div class="file-meta" id="fileMeta">—</div>
+        <div class="file-name" id="fileName"></div>
+        <div class="file-meta" id="fileMeta"></div>
       </div>
     </div>
     <button class="btn-clear" onclick="clearFile()">✕ Clear</button>
@@ -180,7 +191,10 @@ footer { border-top:1px solid var(–border); padding:14px 32px; font-family:var
       <span class="spinner"></span>
       <span class="btn-label">⚙ Build Report</span>
     </button>
-    <span class="build-hint">Filters MEA countries · applies status logic · exports .xlsx</span>
+    <button class="btn-download" id="downloadBtn" onclick="downloadReport()" disabled style="display:none">
+      ⬇ Download .xlsx
+    </button>
+    <span class="build-hint" id="buildHint">Filters MEA countries · applies status logic · exports colour-coded .xlsx</span>
   </div>
 
   <div class="log-panel" id="logPanel"></div>
@@ -188,19 +202,14 @@ footer { border-top:1px solid var(–border); padding:14px 32px; font-family:var
   <div class="preview-panel" id="previewPanel">
     <div class="preview-header">
       <div class="preview-title" id="previewTitle">Preview</div>
-      <div>
-        <button class="btn-download" id="downloadBtn" onclick="downloadReport()">⬇ Download .xlsx</button>
-      </div>
     </div>
     <div class="stats-row" id="statsRow"></div>
     <div class="tbl-wrap">
       <table class="preview-table">
-        <thead>
-          <tr>
-            <th>HAWB</th><th>Lane Pair</th><th>RTX Business Unit</th>
-            <th>Status</th><th>Solution</th><th>MAWB</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>HAWB</th><th>Lane Pair</th><th>RTX Business Unit</th>
+          <th>Status</th><th>Solution</th><th>MAWB</th>
+        </tr></thead>
         <tbody id="previewBody"></tbody>
       </table>
     </div>
@@ -208,27 +217,55 @@ footer { border-top:1px solid var(–border); padding:14px 32px; font-family:var
 </main>
 
 <footer>
-  <span>MEA Report Builder · v1.0</span>
+  <span>MEA Report Builder · v2.0</span>
   <span>All processing runs locally in your browser — no data is uploaded</span>
 </footer>
 </div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
-let workbook = null;
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let workbook   = null;
 let outputRows = [];
-let outputFilename = '';
+let outputFile = '';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────────────────────
 const MEA_CODES = new Set(['AE','BH','EG','IL','IR','IQ','JO','KW','LB','OM','QA','SA','SY','YE']);
 
-// ── Utilities ──────────────────────────────────────────────────────────────
+// ExcelJS fill definitions (argb = Alpha+RGB, fully opaque)
+const XL_FILLS = {
+  header:     { type:'pattern', pattern:'solid', fgColor:{ argb:'FF1A1916' } },
+  booked:     { type:'pattern', pattern:'solid', fgColor:{ argb:'FF92D050' } },  // light green
+  in_transit: { type:'pattern', pattern:'solid', fgColor:{ argb:'FFBDD7EE' } },  // light blue
+  pending:    { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFC000' } },  // orange
+  arrived:    { type:'pattern', pattern:'none'  },
+};
+
+const XL_FONT_HDR  = { name:'Aptos Narrow', size:11, bold:true,  color:{ argb:'FFF5F4F0' } };
+const XL_FONT_DATA = { name:'Aptos Narrow', size:11, bold:false, color:{ argb:'FF1A1916' } };
+
+const XL_BORDER = {
+  top:    { style:'thin', color:{ argb:'FF000000' } },
+  bottom: { style:'thin', color:{ argb:'FF000000' } },
+  left:   { style:'thin', color:{ argb:'FF000000' } },
+  right:  { style:'thin', color:{ argb:'FF000000' } },
+};
+
+const SORT_ORDER = { pending:0, booked:1, in_transit:2, arrived:3 };
+const HEADERS    = ['HAWB','Lane Pair','RTX Business Unit','Status','Solution','MAWB'];
+const COL_WIDTHS = [9, 10, 29, 16, 62, 13];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILITIES
+// ─────────────────────────────────────────────────────────────────────────────
 function getCode(v) {
   if (!v) return '';
   const s = String(v).trim();
   if (!s || s === 'nan' || s === 'None') return '';
-  if (s.length === 5) return s.slice(2);
-  if (s.length > 3)   return s.slice(-3);
-  return s;
+  return s.length === 5 ? s.slice(2) : s.length > 3 ? s.slice(-3) : s;
 }
 
 function toDate(v) {
@@ -248,17 +285,17 @@ function dateOnly(v) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 function fmtDate(v) {
   const d = toDate(v);
   if (!d) return '';
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${String(d.getUTCDate()).padStart(2,'0')}${MONTHS[d.getUTCMonth()]}${String(d.getUTCFullYear()).slice(-2)}`;
 }
 
 function fmtDatetime(v) {
   const d = toDate(v);
   if (!d) return '';
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const dt = `${String(d.getUTCDate()).padStart(2,'0')}${MONTHS[d.getUTCMonth()]}${String(d.getUTCFullYear()).slice(-2)}`;
   const tm = `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
   return `${dt} ${tm}`;
@@ -274,33 +311,34 @@ function getBU(consignee) {
   return 'Collins Aerospace';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGGING
+// ─────────────────────────────────────────────────────────────────────────────
 function log(msg, type = 'info') {
   const p = document.getElementById('logPanel');
   p.classList.add('visible');
-  const line = document.createElement('p');
-  line.className = `log-line ${type}`;
-  line.textContent = msg;
-  p.appendChild(line);
+  const el = document.createElement('p');
+  el.className = `ll ${type}`;
+  el.textContent = msg;
+  p.appendChild(el);
   p.scrollTop = p.scrollHeight;
 }
-
 function clearLog() {
   const p = document.getElementById('logPanel');
-  p.innerHTML = '';
-  p.classList.remove('visible');
+  p.innerHTML = ''; p.classList.remove('visible');
 }
 
-// ── File handling ──────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// FILE HANDLING
+// ─────────────────────────────────────────────────────────────────────────────
 const dropZone  = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 
 dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
 dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
 dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('drag-over');
-  const f = e.dataTransfer.files[0];
-  if (f) handleFile(f);
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0]; if (f) handleFile(f);
 });
 fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
 
@@ -308,13 +346,12 @@ function handleFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-      const sheet = workbook.Sheets['mydhli_shipments'];
-      if (!sheet) {
-        alert('Could not find sheet named "mydhli_shipments". Please check the file.');
+      workbook = XLSX.read(e.target.result, { type:'array', cellDates:true });
+      if (!workbook.Sheets['mydhli_shipments']) {
+        alert('Sheet "mydhli_shipments" not found. Please check the file.');
         return;
       }
-      const range = XLSX.utils.decode_range(sheet['!ref']);
+      const range = XLSX.utils.decode_range(workbook.Sheets['mydhli_shipments']['!ref']);
       const rowCount = Math.max(0, range.e.r - 10);
 
       document.getElementById('fileName').textContent = file.name;
@@ -324,17 +361,13 @@ function handleFile(file) {
       document.getElementById('optionsPanel').classList.add('visible');
       document.getElementById('buildRow').style.display = 'flex';
 
-      const base = file.name.replace(/\.[^.]+$/, '').replace('MEA_Report', 'DGF_MEA_Updates');
-      document.getElementById('outputName').value = base + '_output.xlsx';
-
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm   = String(today.getMonth() + 1).padStart(2, '0');
-      const dd   = String(today.getDate()).padStart(2, '0');
-      document.getElementById('cutoffDate').value = `${yyyy}-${mm}-${dd}`;
-    } catch(err) {
-      alert('Error reading file: ' + err.message);
-    }
+      // Defaults
+      const base = file.name.replace(/\.[^.]+$/, '').replace('MEA_Report','DGF_MEA_Updates');
+      document.getElementById('outputName').value = base + '.xlsx';
+      const t = new Date();
+      document.getElementById('cutoffDate').value =
+        `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    } catch(err) { alert('Error reading file: ' + err.message); }
   };
   reader.readAsArrayBuffer(file);
 }
@@ -345,19 +378,24 @@ function clearFile() {
   document.getElementById('dropZone').style.display = 'block';
   document.getElementById('optionsPanel').classList.remove('visible');
   document.getElementById('buildRow').style.display = 'none';
+  document.getElementById('downloadBtn').style.display = 'none';
   document.getElementById('previewPanel').classList.remove('visible');
   document.getElementById('previewBody').innerHTML = '';
-  clearLog();
-  fileInput.value = '';
+  clearLog(); fileInput.value = '';
 }
 
-// ── Build ──────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// BUILD
+// ─────────────────────────────────────────────────────────────────────────────
 function buildReport() {
   if (!workbook) return;
   const btn = document.getElementById('buildBtn');
   btn.classList.add('loading'); btn.disabled = true;
+  document.getElementById('downloadBtn').style.display = 'none';
+  document.getElementById('downloadBtn').disabled = true;
   clearLog();
   document.getElementById('previewPanel').classList.remove('visible');
+
   setTimeout(() => {
     try   { _doBuild(); }
     catch (err) { log('ERROR: ' + err.message, 'error'); console.error(err); }
@@ -368,80 +406,77 @@ function buildReport() {
 function _doBuild() {
   const cutoffStr = document.getElementById('cutoffDate').value;
   const cutoff    = cutoffStr ? new Date(cutoffStr + 'T00:00:00Z') : new Date();
-  outputFilename  = (document.getElementById('outputName').value || 'DGF_MEA_Updates.xlsx').replace(/(?<!\.xlsx)$/, '');
-  if (!outputFilename.endsWith('.xlsx')) outputFilename += '.xlsx';
+  outputFile = (document.getElementById('outputName').value || 'DGF_MEA_Updates.xlsx').trim();
+  if (!outputFile.endsWith('.xlsx')) outputFile += '.xlsx';
 
-  log(`▶ Starting build  ·  cutoff: ${cutoffStr || 'today'}`, 'bold');
+  log(`▶ Build started  ·  cutoff: ${cutoffStr || 'today'}`, 'bold');
 
   const sheet = workbook.Sheets['mydhli_shipments'];
   const range = XLSX.utils.decode_range(sheet['!ref']);
 
-  // Map column headers (row 10 = index 9)
+  // Map header row (row 10 = index 9)
   const colMap = {};
   for (let c = range.s.c; c <= range.e.c; c++) {
-    const cell = sheet[XLSX.utils.encode_cell({ r: 9, c })];
+    const cell = sheet[XLSX.utils.encode_cell({ r:9, c })];
     if (cell && cell.v) colMap[String(cell.v)] = c;
   }
 
-  const COLS = {
-    HAWB:      colMap['HouseBill'],
-    ORIG_CC:   colMap['Origin Country/Region Code'],
-    DEST_CC:   colMap['Destination Country/Region Code'],
-    CONSIGNEE: colMap['Consignee Name'],
-    MAWB:      colMap['MasterBill'],
-    AK:        colMap['Origin Code (First Leg)'],
-    AN:        colMap['Destination Code (First Leg)'],
-    AZ:        colMap['Destination Code (Last Leg)'],
-    AP:        colMap['Estimated Departure (First Leg)'],
-    AQ:        colMap['Actual Departure (First Leg)'],
-    BD:        colMap['Actual Departure (Last Leg)'],
-    BE:        colMap['Estimated Arrival (Last Leg)'],
-    BF:        colMap['Actual Arrival (Last Leg)'],
-    BJ:        colMap['Actual Arrival'],
+  const C = {
+    HAWB:    colMap['HouseBill'],
+    ORIG_CC: colMap['Origin Country/Region Code'],
+    DEST_CC: colMap['Destination Country/Region Code'],
+    CONS:    colMap['Consignee Name'],
+    MAWB:    colMap['MasterBill'],
+    AK:      colMap['Origin Code (First Leg)'],
+    AN:      colMap['Destination Code (First Leg)'],
+    AZ:      colMap['Destination Code (Last Leg)'],
+    AP:      colMap['Estimated Departure (First Leg)'],
+    AQ:      colMap['Actual Departure (First Leg)'],
+    BD:      colMap['Actual Departure (Last Leg)'],
+    BE:      colMap['Estimated Arrival (Last Leg)'],
+    BF:      colMap['Actual Arrival (Last Leg)'],
+    BJ:      colMap['Actual Arrival'],
   };
 
-  const missing = Object.entries(COLS).filter(([,v]) => v === undefined).map(([k]) => k);
+  const missing = Object.entries(C).filter(([,v]) => v == null).map(([k]) => k);
   if (missing.length) log(`⚠ Columns not found: ${missing.join(', ')}`, 'warn');
 
   function cv(r, key) {
-    const c = COLS[key];
-    if (c === undefined) return null;
+    const c = C[key]; if (c == null) return null;
     const cell = sheet[XLSX.utils.encode_cell({ r, c })];
     return cell ? (cell.v !== undefined ? cell.v : null) : null;
   }
 
   const rows = [];
-  let removedCount = 0, meaCount = 0;
+  let removed = 0, meaTotal = 0;
 
   for (let r = 10; r <= range.e.r; r++) {
-    const hawb = String(cv(r, 'HAWB') || '').trim();
+    const hawb = String(cv(r,'HAWB') || '').trim();
     if (!hawb) continue;
 
-    const origCC = String(cv(r, 'ORIG_CC') || '').trim().toUpperCase();
-    const destCC = String(cv(r, 'DEST_CC') || '').trim().toUpperCase();
-    if (!MEA_CODES.has(origCC) && !MEA_CODES.has(destCC)) continue;
-    meaCount++;
+    const oc = String(cv(r,'ORIG_CC') || '').toUpperCase();
+    const dc = String(cv(r,'DEST_CC') || '').toUpperCase();
+    if (!MEA_CODES.has(oc) && !MEA_CODES.has(dc)) continue;
+    meaTotal++;
 
-    const ap = cv(r, 'AP'), aq = cv(r, 'AQ');
-    const bd = cv(r, 'BD'), be = cv(r, 'BE');
-    const bf = cv(r, 'BF'), bj = cv(r, 'BJ');
-    const ak = getCode(cv(r, 'AK'));
-    const an = getCode(cv(r, 'AN'));
-    const az = getCode(cv(r, 'AZ'));
+    const ap = cv(r,'AP'), aq = cv(r,'AQ');
+    const bd = cv(r,'BD'), be = cv(r,'BE');
+    const bf = cv(r,'BF'), bj = cv(r,'BJ');
+    const ak = getCode(cv(r,'AK')), an = getCode(cv(r,'AN')), az = getCode(cv(r,'AZ'));
     const dest = az || an;
     const lane = (ak && dest) ? `${ak}-${dest}` : (ak || dest || '');
 
-    let mawb = String(cv(r, 'MAWB') || '');
+    let mawb = String(cv(r,'MAWB') || '');
     if (mawb.includes(',')) mawb = mawb.split(',')[1].trim();
     if (mawb === 'nan' || mawb === 'None') mawb = '';
 
-    const bu = getBU(cv(r, 'CONSIGNEE'));
+    const bu     = getBU(cv(r,'CONS'));
     const arrRaw = bd || bf || bj;
     let status, cat, solution;
 
     if (arrRaw) {
       const arrDate = dateOnly(arrRaw);
-      if (arrDate && arrDate < cutoff) { removedCount++; continue; }
+      if (arrDate && arrDate < cutoff) { removed++; continue; }
       status = 'Arrived'; cat = 'arrived';
       solution = `Arrived on ${fmtDate(arrRaw)}`;
     } else if (ap && aq) {
@@ -459,157 +494,161 @@ function _doBuild() {
     rows.push({ hawb, lane, bu, status, solution, mawb, cat });
   }
 
-  log(`  Found ${meaCount} MEA rows`, 'info');
-  log(`  Removed ${removedCount} rows arrived before cutoff`, removedCount > 0 ? 'warn' : 'dim');
+  log(`  MEA rows found   : ${meaTotal}`, 'info');
+  log(`  Removed (pre-cutoff): ${removed}`, removed > 0 ? 'warn' : 'dim');
 
-  const ORDER = { pending:0, booked:1, in_transit:2, arrived:3 };
   const isTLV = r => r.lane.includes('TLV');
+  const sort  = arr => arr.slice().sort((a,b) => SORT_ORDER[a.cat] - SORT_ORDER[b.cat]);
 
-  const nonTLV = rows.filter(r => !isTLV(r)).sort((a,b) => ORDER[a.cat] - ORDER[b.cat]);
-  const tlv    = rows.filter(r =>  isTLV(r)).sort((a,b) => ORDER[a.cat] - ORDER[b.cat]);
-  outputRows = [...nonTLV, ...tlv];
+  const nonTLV = sort(rows.filter(r => !isTLV(r)));
+  const tlv    = sort(rows.filter(r =>  isTLV(r)));
+  outputRows   = [...nonTLV, ...tlv];
 
-  const counts = { pending:0, booked:0, in_transit:0, arrived:0 };
-  rows.forEach(r => counts[r.cat]++);
+  const ct = { pending:0, booked:0, in_transit:0, arrived:0 };
+  rows.forEach(r => ct[r.cat]++);
 
   log('', 'dim');
-  log(`  Non-TLV rows : ${nonTLV.length}`, 'info');
-  log(`  TLV rows     : ${tlv.length}`,    'info');
-  log(`  Total        : ${rows.length}`,   'bold');
+  log(`  Non-TLV : ${nonTLV.length}  ·  TLV : ${tlv.length}  ·  Total : ${rows.length}`, 'bold');
   log('', 'dim');
-  if (counts.pending)    log(`  Pending      : ${counts.pending}`,    'warn');
-  if (counts.booked)     log(`  Booked       : ${counts.booked}`,     'info');
-  if (counts.in_transit) log(`  In Transit   : ${counts.in_transit}`, 'info');
-  if (counts.arrived)    log(`  Arrived      : ${counts.arrived}`,    'dim');
+  if (ct.pending)    log(`  🟠 Pending    : ${ct.pending}`,    'warn');
+  if (ct.booked)     log(`  🟢 Booked     : ${ct.booked}`,     'info');
+  if (ct.in_transit) log(`  🔵 In Transit : ${ct.in_transit}`, 'info');
+  if (ct.arrived)    log(`  ⬜ Arrived    : ${ct.arrived}`,    'dim');
   log('', 'dim');
-  log('✓ Build complete · ready to download', 'bold');
+  log('✓ Done — click Download to get your .xlsx', 'bold');
 
-  renderPreview(nonTLV, tlv, counts, rows.length);
+  renderPreview(nonTLV, tlv, ct, rows.length);
+
+  const dlBtn = document.getElementById('downloadBtn');
+  dlBtn.style.display = 'flex'; dlBtn.disabled = false;
 }
 
-// ── Preview ────────────────────────────────────────────────────────────────
-function renderPreview(nonTLV, tlv, counts, total) {
+// ─────────────────────────────────────────────────────────────────────────────
+// PREVIEW
+// ─────────────────────────────────────────────────────────────────────────────
+function renderPreview(nonTLV, tlv, ct, total) {
   const tbody = document.getElementById('previewBody');
   tbody.innerHTML = '';
 
-  function sectionHeader(label) {
+  const secHdr = label => {
     const tr = document.createElement('tr');
-    tr.className = 'row-section-header';
+    tr.className = 'row-sec-hdr';
     const td = document.createElement('td');
     td.colSpan = 6; td.textContent = label;
-    tr.appendChild(td);
-    return tr;
-  }
+    tr.appendChild(td); return tr;
+  };
 
-  function dataRow(r) {
+  const dataRow = r => {
     const tr = document.createElement('tr');
     tr.className = r.cat === 'in_transit' ? 'row-transit' : `row-${r.cat}`;
     const pillCls = { pending:'pill-pending', booked:'pill-booked', in_transit:'pill-transit', arrived:'pill-arrived' }[r.cat];
-    [r.hawb, r.lane, r.bu, `<span class="pill-status ${pillCls}">${r.status}</span>`, r.solution, r.mawb].forEach((v, i) => {
+    [r.hawb, r.lane, r.bu, `<span class="pill ${pillCls}">${r.status}</span>`, r.solution, r.mawb].forEach((v,i) => {
       const td = document.createElement('td');
-      if (i === 3) { td.innerHTML = v; }
-      else {
-        td.textContent = v || '';
-        if (i === 4) { td.style.maxWidth = '320px'; td.style.fontSize = '11px'; }
-      }
+      if (i === 3) td.innerHTML = v; else { td.textContent = v||''; if (i===4){ td.style.maxWidth='320px'; td.style.fontSize='11px'; } }
       tr.appendChild(td);
-    });
-    return tr;
-  }
+    }); return tr;
+  };
 
-  tbody.appendChild(sectionHeader(`Non-TLV Lanes — ${nonTLV.length} rows`));
+  tbody.appendChild(secHdr(`Non-TLV Lanes — ${nonTLV.length} rows`));
   nonTLV.forEach(r => tbody.appendChild(dataRow(r)));
-  tbody.appendChild(sectionHeader(`TLV Lanes — ${tlv.length} rows`));
+  tbody.appendChild(secHdr(`TLV Lanes — ${tlv.length} rows`));
   tlv.forEach(r => tbody.appendChild(dataRow(r)));
 
   document.getElementById('statsRow').innerHTML = `
-    <span class="stat-chip stat-total"><span class="dot" style="background:var(--text)"></span>${total} rows</span>
-    ${counts.pending    ? `<span class="stat-chip stat-pending"><span class="dot"></span>${counts.pending} Pending</span>`       : ''}
-    ${counts.booked     ? `<span class="stat-chip stat-booked"><span class="dot"></span>${counts.booked} Booked</span>`          : ''}
-    ${counts.in_transit ? `<span class="stat-chip stat-transit"><span class="dot"></span>${counts.in_transit} In Transit</span>` : ''}
-    ${counts.arrived    ? `<span class="stat-chip stat-arrived"><span class="dot"></span>${counts.arrived} Arrived</span>`       : ''}
+    <span class="chip chip-total"><span class="dot" style="background:var(--text)"></span>${total} rows</span>
+    ${ct.pending    ? `<span class="chip chip-pending"><span class="dot"></span>${ct.pending} Pending</span>`       : ''}
+    ${ct.booked     ? `<span class="chip chip-booked"><span class="dot"></span>${ct.booked} Booked</span>`          : ''}
+    ${ct.in_transit ? `<span class="chip chip-transit"><span class="dot"></span>${ct.in_transit} In Transit</span>` : ''}
+    ${ct.arrived    ? `<span class="chip chip-arrived"><span class="dot"></span>${ct.arrived} Arrived</span>`       : ''}
   `;
-  document.getElementById('previewTitle').textContent = `Preview — ${outputFilename}`;
+  document.getElementById('previewTitle').textContent = `Preview — ${outputFile}`;
   document.getElementById('previewPanel').classList.add('visible');
 }
 
-// ── Download ───────────────────────────────────────────────────────────────
-function downloadReport() {
+// ─────────────────────────────────────────────────────────────────────────────
+// DOWNLOAD — uses ExcelJS for full colour/style support
+// ─────────────────────────────────────────────────────────────────────────────
+async function downloadReport() {
   if (!outputRows.length) return;
 
-  const wb    = XLSX.utils.book_new();
-  const isTLV = r => r.lane.includes('TLV');
-  const nonTLV = outputRows.filter(r => !isTLV(r));
-  const tlv    = outputRows.filter(r =>  isTLV(r));
+  const dlBtn = document.getElementById('downloadBtn');
+  dlBtn.disabled = true;
+  dlBtn.textContent = '⏳ Generating…';
 
-  // Fill colours (ARGB)
-  const FILLS = {
-    header:     { fgColor: { rgb: 'FF1A1916' }, patternType: 'solid' },
-    booked:     { fgColor: { rgb: 'FF92D050' }, patternType: 'solid' },
-    in_transit: { fgColor: { rgb: 'FFBDD7EE' }, patternType: 'solid' },
-    pending:    { fgColor: { rgb: 'FFFFC000' }, patternType: 'solid' },
-    arrived:    { patternType: 'none' },
-  };
+  try {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Updates');
 
-  const BORDER = {
-    top:    { style: 'thin', color: { rgb: 'FF000000' } },
-    bottom: { style: 'thin', color: { rgb: 'FF000000' } },
-    left:   { style: 'thin', color: { rgb: 'FF000000' } },
-    right:  { style: 'thin', color: { rgb: 'FF000000' } },
-  };
+    // Column widths
+    ws.columns = HEADERS.map((h, i) => ({ header: h, width: COL_WIDTHS[i] }));
+    ws.getRow(1).values = []; // clear auto-set header row — we'll write manually
 
-  const FONT_HDR  = { name: 'Aptos Narrow', sz: 11, bold: true,  color: { rgb: 'FFF5F4F0' } };
-  const FONT_DATA = { name: 'Aptos Narrow', sz: 11, bold: false, color: { rgb: 'FF1A1916' } };
+    const isTLV  = r => r.lane.includes('TLV');
+    const nonTLV = outputRows.filter(r => !isTLV(r));
+    const tlv    = outputRows.filter(r =>  isTLV(r));
 
-  function hdrCell(v) {
-    return { v, t: 's', s: { font: FONT_HDR, fill: FILLS.header, border: BORDER, alignment: { vertical: 'center' } } };
+    let currentRow = 1;
+    let filterRowNumber = -1;
+
+    // ── Helper: style a row ───────────────────────────────────────────────
+    function styleRow(xlRow, fillKey, isHeader) {
+      xlRow.eachCell({ includeEmpty: true }, cell => {
+        cell.font   = isHeader ? { ...XL_FONT_HDR } : { ...XL_FONT_DATA };
+        cell.fill   = { ...XL_FILLS[fillKey] };
+        cell.border = { ...XL_BORDER };
+        cell.alignment = { vertical: 'middle', wrapText: false };
+      });
+      xlRow.height = 16;
+    }
+
+    // ── Write header row ──────────────────────────────────────────────────
+    function writeHeader(isFilterRow) {
+      const row = ws.getRow(currentRow);
+      row.values = HEADERS;
+      styleRow(row, 'header', true);
+      if (isFilterRow) filterRowNumber = currentRow;
+      row.commit();
+      currentRow++;
+    }
+
+    // ── Write data row ────────────────────────────────────────────────────
+    function writeDataRow(r) {
+      const row = ws.getRow(currentRow);
+      row.values = [r.hawb, r.lane, r.bu, r.status, r.solution, r.mawb];
+      styleRow(row, r.cat, false);
+      row.commit();
+      currentRow++;
+    }
+
+    // Section 1: Non-TLV
+    writeHeader(false);
+    nonTLV.forEach(r => writeDataRow(r));
+
+    // Section 2: TLV (with auto-filter)
+    writeHeader(true);
+    tlv.forEach(r => writeDataRow(r));
+
+    // Auto-filter on TLV header row
+    if (filterRowNumber > 0) {
+      ws.autoFilter = {
+        from: { row: filterRowNumber, column: 1 },
+        to:   { row: filterRowNumber, column: 6 },
+      };
+    }
+
+    // Generate and save
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob   = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, outputFile);
+
+    log(`⬇ Downloaded: ${outputFile}`, 'bold');
+  } catch(err) {
+    log('Download error: ' + err.message, 'error');
+    console.error(err);
   }
 
-  function dataCell(v, cat) {
-    return { v: v || '', t: 's', s: { font: FONT_DATA, fill: FILLS[cat] || FILLS.arrived, border: BORDER, alignment: { vertical: 'center', wrapText: false } } };
-  }
-
-  const HEADERS = ['HAWB', 'Lane Pair', 'RTX Business Unit', 'Status', 'Solution', 'MAWB'];
-  const sheetAoa = [];
-  let rowIdx = 0;
-  let filterRowIdx = -1;
-
-  function pushHeader(isFilter) {
-    sheetAoa.push(HEADERS.map(h => hdrCell(h)));
-    if (isFilter) filterRowIdx = rowIdx;
-    rowIdx++;
-  }
-
-  function pushRow(r) {
-    sheetAoa.push([r.hawb, r.lane, r.bu, r.status, r.solution, r.mawb].map(v => dataCell(v, r.cat)));
-    rowIdx++;
-  }
-
-  pushHeader(false);
-  nonTLV.forEach(r => pushRow(r));
-  pushHeader(true);
-  tlv.forEach(r => pushRow(r));
-
-  const ws = XLSX.utils.aoa_to_sheet(sheetAoa.map(row => row.map(c => c.v)));
-
-  // Apply styles cell-by-cell
-  sheetAoa.forEach((row, ri) => {
-    row.forEach((cell, ci) => {
-      const addr = XLSX.utils.encode_cell({ r: ri, c: ci });
-      if (!ws[addr]) ws[addr] = {};
-      ws[addr].s = cell.s;
-    });
-  });
-
-  if (filterRowIdx >= 0) {
-    ws['!autofilter'] = { ref: `A${filterRowIdx + 1}:F${filterRowIdx + 1}` };
-  }
-
-  ws['!cols'] = [{ wch: 9 }, { wch: 10 }, { wch: 29 }, { wch: 16 }, { wch: 62 }, { wch: 13 }];
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Updates');
-  XLSX.writeFile(wb, outputFilename, { bookType: 'xlsx', type: 'binary', cellStyles: true });
-  log(`⬇ Downloaded: ${outputFilename}`, 'bold');
+  dlBtn.disabled = false;
+  dlBtn.innerHTML = '⬇ Download .xlsx';
 }
 </script>
 
